@@ -11,11 +11,23 @@ My fork currently differs from the original code in the following ways. What I d
 5) Fixed the Fahrenheit mode
 6) Implemented an optional silent mode (no beeping), only works for module sent commands (not for
    remote control sent commands)
+7) **Added 8 fan speed levels** (Auto, Quiet, Low, Medium-Low, Medium, Medium-High, High, Turbo) for granular control
    
 It's now compatible with GRJWB04-J / Cs532ae wifi modules
 
 # Current state:
 No known problems! if you run into an issue though, please let me know.
+
+## Features:
+- **8 Fan Speed Levels**: Auto, Quiet, Low, Medium-Low, Medium, Medium-High, High, and Turbo modes for precise control
+- Temperature control (16°C - 30°C)
+- Multiple operating modes: Auto, Cool, Heat, Dry, Fan Only
+- Vertical and horizontal swing control
+- Plasma, X-fan, Sleep, and Energy Saving modes
+- Optional silent operation (no beeping)
+- Display control and temperature unit selection (°C/°F)
+
+See [FAN_LEVELS.md](FAN_LEVELS.md) for detailed information about fan speed levels.
 
 # HOW TO 
 You can flash this to an ESP module. I used an ESP01-M module, like this one:
