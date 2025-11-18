@@ -24,11 +24,11 @@ climate::ClimateTraits SinclairAC::traits()
                                 climate::CLIMATE_MODE_HEAT, climate::CLIMATE_MODE_FAN_ONLY, climate::CLIMATE_MODE_DRY});
 
     traits.add_supported_custom_fan_mode(fan_modes::FAN_AUTO);
-    //traits.add_supported_custom_fan_mode(fan_modes::FAN_QUIET);
+    traits.add_supported_custom_fan_mode(fan_modes::FAN_QUIET);
     traits.add_supported_custom_fan_mode(fan_modes::FAN_LOW);
-   // traits.add_supported_custom_fan_mode(fan_modes::FAN_MEDL);
+    traits.add_supported_custom_fan_mode(fan_modes::FAN_MEDL);
     traits.add_supported_custom_fan_mode(fan_modes::FAN_MED);
-    //traits.add_supported_custom_fan_mode(fan_modes::FAN_MEDH);
+    traits.add_supported_custom_fan_mode(fan_modes::FAN_MEDH);
     traits.add_supported_custom_fan_mode(fan_modes::FAN_HIGH);
     traits.add_supported_custom_fan_mode(fan_modes::FAN_TURBO);
 
