@@ -1,1 +1,6 @@
 components/sinclair_ac/.vscode/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
