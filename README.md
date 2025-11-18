@@ -26,8 +26,69 @@ No known problems! if you run into an issue though, please let me know.
 - Plasma, X-fan, Sleep, and Energy Saving modes
 - Optional silent operation (no beeping)
 - Display control and temperature unit selection (°C/°F)
+- **Universal External Sensor Support**: Use external ATC BLE temperature/humidity sensors
+- **Robust Temperature Source Selection**: Choose between AC's own sensor or external ATC sensor
+- **Automatic Fallback Logic**: Automatically falls back to AC sensor if external sensor fails or times out
 
 See [FAN_LEVELS.md](FAN_LEVELS.md) for detailed information about fan speed levels.
+
+## External Temperature Sensor Support
+
+The component now supports using external ATC (Xiaomi) BLE temperature/humidity sensors as an alternative to the AC's built-in temperature sensor. This feature provides:
+
+### Features:
+- **Dynamic MAC Configuration**: Configure the ATC sensor's MAC address from Home Assistant without firmware reload
+- **Temperature Source Selection**: Choose between "AC Own Sensor" or "External ATC Sensor" via a select entity
+- **Automatic Fallback**: If the external sensor becomes unavailable or doesn't send data for 15 minutes, the system automatically falls back to the AC's own sensor
+- **High Precision**: ATC temperature readings are displayed with 2 decimal places for greater accuracy
+- **Additional Sensors**: When using an ATC sensor, both temperature and humidity are available in Home Assistant
+
+### Configuration:
+Add the following to your YAML configuration:
+
+```yaml
+climate:
+  - platform: sinclair_ac
+    name: "Living Room AC"
+    # ... other configuration ...
+    
+    # Temperature source selector
+    temp_source_select:
+      name: "AC Temperature Source"
+    
+    # ATC MAC address input (format: AA:BB:CC:DD:EE:FF)
+    atc_mac_address_text:
+      name: "ATC MAC Address"
+      mode: text
+    
+    # AC's indoor temperature sensor
+    ac_indoor_temp_sensor:
+      name: "AC Indoor Temperature"
+      unit_of_measurement: "°C"
+      accuracy_decimals: 1
+    
+    # ATC sensor readings (shown when ATC sensor is configured)
+    atc_room_temp_sensor:
+      name: "ATC Room Temperature"
+      unit_of_measurement: "°C"
+      accuracy_decimals: 2
+    
+    atc_room_humidity_sensor:
+      name: "ATC Room Humidity"
+      unit_of_measurement: "%"
+      accuracy_decimals: 1
+```
+
+### Usage:
+1. In Home Assistant, enter the MAC address of your ATC sensor in the "ATC MAC Address" text input (format: AA:BB:CC:DD:EE:FF)
+2. Set up your ATC sensor to send temperature/humidity data (typically via ESPHome's BLE tracking or Home Assistant's bluetooth integration)
+3. Use the "AC Temperature Source" select entity to switch between "AC Own Sensor" and "External ATC Sensor"
+4. If the external sensor fails or doesn't send data for 15 minutes, the system automatically falls back to the AC's sensor and logs the event
+
+### Notes:
+- The fallback mechanism ensures your AC continues to work even if the external sensor fails
+- All sensor names appear clearly in Home Assistant for easy identification
+- This feature works universally across all rooms and sensors in your setup
 
 # HOW TO 
 You can flash this to an ESP module. I used an ESP01-M module, like this one:

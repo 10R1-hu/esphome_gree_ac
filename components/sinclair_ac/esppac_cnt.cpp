@@ -743,13 +743,25 @@ bool SinclairACCNT::processUnitReport()
     }
     
     /* if there is no external sensor mapped to represent current temperature we will get data from AC unit */
+    float acIndoorTemperature = (float)(this->serialProcess_.data[protocol::REPORT_TEMP_ACT_BYTE] - 40);
+    
+    // Publish AC indoor temperature sensor if available
+    if (this->ac_indoor_temp_sensor_ != nullptr) {
+        this->ac_indoor_temp_sensor_->publish_state(acIndoorTemperature);
+    }
+    
+    // Update current_temperature based on selected source
     if (this->current_temperature_sensor_ == nullptr)
     {
-        float newCurrentTemperature = (float)(this->serialProcess_.data[protocol::REPORT_TEMP_ACT_BYTE] - 40);
-    //    float newCurrentTemperature = (float)(((this->serialProcess_.data[protocol::REPORT_TEMP_ACT_BYTE] & protocol::REPORT_TEMP_ACT_MASK) >> protocol::REPORT_TEMP_ACT_POS)
-     //       - protocol::REPORT_TEMP_ACT_OFF) / protocol::REPORT_TEMP_ACT_DIV;
-        if (this->current_temperature != newCurrentTemperature) hasChanged = true;
-        this->update_current_temperature(newCurrentTemperature);
+        // If not using legacy external sensor, check if we should use ATC sensor or AC sensor
+        if (this->is_using_atc_sensor() && this->atc_sensor_valid_) {
+            // Use ATC sensor value (already set via update_atc_sensor)
+            // Current temperature was already updated via update_atc_sensor callback
+        } else {
+            // Use AC's own sensor
+            if (this->current_temperature != acIndoorTemperature) hasChanged = true;
+            this->update_current_temperature(acIndoorTemperature);
+        }
     }
 
     std::string verticalSwing = determine_vertical_swing();
@@ -1048,6 +1060,26 @@ void SinclairACCNT::on_display_unit_change(const std::string &display_unit)
 
     this->update_ = ACUpdate::UpdateStart;
     this->display_unit_state_ = display_unit;
+}
+
+void SinclairACCNT::on_temp_source_change(const std::string &temp_source)
+{
+    ESP_LOGD(TAG, "Setting temperature source to: %s", temp_source.c_str());
+    
+    this->temp_source_state_ = temp_source;
+    
+    // If switching to ATC sensor, validate MAC address
+    if (temp_source == temp_source_options::EXTERNAL_ATC) {
+        if (this->atc_mac_address_text_ == nullptr || this->atc_mac_address_text_->state.empty()) {
+            ESP_LOGW(TAG, "Cannot switch to ATC sensor: MAC address not configured");
+            this->temp_source_state_ = temp_source_options::AC_OWN;
+            this->update_temp_source(this->temp_source_state_);
+            return;
+        }
+        ESP_LOGI(TAG, "Switched to ATC sensor (MAC: %s)", this->atc_mac_address_text_->state.c_str());
+    } else {
+        ESP_LOGI(TAG, "Switched to AC own sensor");
+    }
 }
 
 void SinclairACCNT::on_plasma_change(bool plasma)
