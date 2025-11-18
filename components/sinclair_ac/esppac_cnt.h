@@ -158,7 +158,6 @@ class SinclairACCNT : public SinclairAC {
 
         void on_display_change(const std::string &display) override;
         void on_display_unit_change(const std::string &display_unit) override;
-        void on_temp_source_change(const std::string &temp_source) override;
 
         void on_plasma_change(bool plasma) override;
         void on_beeper_change(bool beeper) override;

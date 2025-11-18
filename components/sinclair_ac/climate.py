@@ -4,9 +4,9 @@ from esphome.const import (
 )
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import uart, climate, sensor, select, switch, text
+from esphome.components import uart, climate, sensor, select, switch
 
-AUTO_LOAD = ["switch", "sensor", "select", "text"]
+AUTO_LOAD = ["switch", "sensor", "select"]
 DEPENDENCIES = ["uart"]
 
 sinclair_ac_ns = cg.esphome_ns.namespace("sinclair_ac")
@@ -23,16 +23,11 @@ SinclairACSelect = sinclair_ac_ns.class_(
     "SinclairACSelect", select.Select, cg.Component
 )
 
-SinclairACText = sinclair_ac_ns.class_(
-    "SinclairACText", text.Text, cg.Component
-)
-
 
 CONF_HORIZONTAL_SWING_SELECT    = "horizontal_swing_select"
 CONF_VERTICAL_SWING_SELECT      = "vertical_swing_select"
 CONF_DISPLAY_SELECT             = "display_select"
 CONF_DISPLAY_UNIT_SELECT        = "display_unit_select"
-CONF_TEMP_SOURCE_SELECT         = "temp_source_select"
 
 CONF_PLASMA_SWITCH              = "plasma_switch"
 CONF_BEEPER_SWITCH              = "beeper_switch"
@@ -41,10 +36,6 @@ CONF_XFAN_SWITCH                = "xfan_switch"
 CONF_SAVE_SWITCH                = "save_switch"
 
 CONF_CURRENT_TEMPERATURE_SENSOR = "current_temperature_sensor"
-CONF_ATC_MAC_ADDRESS_TEXT       = "atc_mac_address_text"
-CONF_AC_INDOOR_TEMP_SENSOR      = "ac_indoor_temp_sensor"
-CONF_ATC_ROOM_TEMP_SENSOR       = "atc_room_temp_sensor"
-CONF_ATC_ROOM_HUMIDITY_SENSOR   = "atc_room_humidity_sensor"
 
 HORIZONTAL_SWING_OPTIONS = [
     "0 - OFF",
@@ -85,14 +76,8 @@ DISPLAY_UNIT_OPTIONS = [
     "F",
 ]
 
-TEMP_SOURCE_OPTIONS = [
-    "AC Own Sensor",
-    "External ATC Sensor",
-]
-
 SWITCH_SCHEMA = switch.switch_schema(SinclairACSwitch).extend(cv.COMPONENT_SCHEMA)
 SELECT_SCHEMA = select.select_schema(SinclairACSelect)
-TEXT_SCHEMA = text.text_schema(SinclairACText).extend(cv.COMPONENT_SCHEMA)
 
 SCHEMA = climate.climate_schema(SinclairACCNT).extend(
     {
@@ -100,16 +85,11 @@ SCHEMA = climate.climate_schema(SinclairACCNT).extend(
         cv.Optional(CONF_VERTICAL_SWING_SELECT): SELECT_SCHEMA,
         cv.Optional(CONF_DISPLAY_SELECT): SELECT_SCHEMA,
         cv.Optional(CONF_DISPLAY_UNIT_SELECT): SELECT_SCHEMA,
-        cv.Optional(CONF_TEMP_SOURCE_SELECT): SELECT_SCHEMA,
         cv.Optional(CONF_PLASMA_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_BEEPER_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_SLEEP_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_XFAN_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_SAVE_SWITCH): SWITCH_SCHEMA,
-        cv.Optional(CONF_ATC_MAC_ADDRESS_TEXT): TEXT_SCHEMA,
-        cv.Optional(CONF_AC_INDOOR_TEMP_SENSOR): sensor.sensor_schema(),
-        cv.Optional(CONF_ATC_ROOM_TEMP_SENSOR): sensor.sensor_schema(),
-        cv.Optional(CONF_ATC_ROOM_HUMIDITY_SENSOR): sensor.sensor_schema(),
     }
 ).extend(uart.UART_DEVICE_SCHEMA)
 
@@ -152,37 +132,9 @@ async def to_code(config):
         await cg.register_component(display_unit_select, conf)
         cg.add(var.set_display_unit_select(display_unit_select))
 
-    if CONF_TEMP_SOURCE_SELECT in config:
-        conf = config[CONF_TEMP_SOURCE_SELECT]
-        temp_source_select = await select.new_select(conf, options=TEMP_SOURCE_OPTIONS)
-        await cg.register_component(temp_source_select, conf)
-        cg.add(var.set_temp_source_select(temp_source_select))
-
-    if CONF_ATC_MAC_ADDRESS_TEXT in config:
-        conf = config[CONF_ATC_MAC_ADDRESS_TEXT]
-        atc_mac_text = cg.new_Pvariable(conf[CONF_ID])
-        await cg.register_component(atc_mac_text, conf)
-        await text.register_text(atc_mac_text, conf)
-        cg.add(var.set_atc_mac_address_text(atc_mac_text))
-
     if CONF_CURRENT_TEMPERATURE_SENSOR in config:
         sens = await cg.get_variable(config[CONF_CURRENT_TEMPERATURE_SENSOR])
         cg.add(var.set_current_temperature_sensor(sens))
-
-    if CONF_AC_INDOOR_TEMP_SENSOR in config:
-        conf = config[CONF_AC_INDOOR_TEMP_SENSOR]
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_ac_indoor_temp_sensor(sens))
-
-    if CONF_ATC_ROOM_TEMP_SENSOR in config:
-        conf = config[CONF_ATC_ROOM_TEMP_SENSOR]
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_atc_room_temp_sensor(sens))
-
-    if CONF_ATC_ROOM_HUMIDITY_SENSOR in config:
-        conf = config[CONF_ATC_ROOM_HUMIDITY_SENSOR]
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_atc_room_humidity_sensor(sens))
         
     for s in [CONF_PLASMA_SWITCH, CONF_BEEPER_SWITCH, CONF_SLEEP_SWITCH, CONF_XFAN_SWITCH, CONF_SAVE_SWITCH]:
         if s in config:

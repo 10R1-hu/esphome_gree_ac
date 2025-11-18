@@ -62,8 +62,6 @@ climate:
       name: ${devicename} Display Mode
     display_unit_select:
       name: ${devicename} Display Unit
-    temp_source_select:
-      name: ${devicename} Temperature Source
     plasma_switch:
       name: ${devicename} Plasma
     beeper_switch:
@@ -73,26 +71,5 @@ climate:
     xfan_switch:
       name: ${devicename} X-fan
     save_switch:
-      name: ${devicename} Save/8 Heat
-    atc_mac_address_text:
-      name: ${devicename} ATC MAC Address
-      mode: text
-    ac_indoor_temp_sensor:
-      name: ${devicename} AC Indoor Temperature
-      unit_of_measurement: "°C"
-      accuracy_decimals: 1
-      device_class: temperature
-      state_class: measurement
-    atc_room_temp_sensor:
-      name: ${devicename} ATC Room Temperature
-      unit_of_measurement: "°C"
-      accuracy_decimals: 2
-      device_class: temperature
-      state_class: measurement
-    atc_room_humidity_sensor:
-      name: ${devicename} ATC Room Humidity
-      unit_of_measurement: "%"
-      accuracy_decimals: 1
-      device_class: humidity
-      state_class: measurement
+      name: ${devicename} Save/8 Heat  
     

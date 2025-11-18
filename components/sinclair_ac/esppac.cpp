@@ -43,10 +43,6 @@ void SinclairAC::setup()
   // Initialize times
     this->init_time_ = millis();
     this->last_packet_sent_ = millis();
-    this->last_atc_sensor_update_ = 0;
-
-    // Initialize temperature source to AC own sensor by default
-    this->temp_source_state_ = temp_source_options::AC_OWN;
 
     ESP_LOGI(TAG, "Sinclair AC component v%s starting...", VERSION);
 }
@@ -54,7 +50,6 @@ void SinclairAC::setup()
 void SinclairAC::loop()
 {
     read_data();  // Read data from UART (if there is any)
-    check_atc_sensor_timeout();  // Check if ATC sensor has timed out
 }
 
 void SinclairAC::read_data()
@@ -187,17 +182,6 @@ void SinclairAC::update_display_unit(const std::string &display_unit)
     }
 }
 
-void SinclairAC::update_temp_source(const std::string &temp_source)
-{
-    this->temp_source_state_ = temp_source;
-
-    if (this->temp_source_select_ != nullptr && 
-        this->temp_source_select_->state != this->temp_source_state_)
-    {
-        this->temp_source_select_->publish_state(this->temp_source_state_);
-    }
-}
-
 void SinclairAC::update_plasma(bool plasma)
 {
     this->plasma_state_ = plasma;
@@ -321,36 +305,6 @@ void SinclairAC::set_display_unit_select(select::Select *display_unit_select)
     });
 }
 
-void SinclairAC::set_temp_source_select(select::Select *temp_source_select)
-{
-    this->temp_source_select_ = temp_source_select;
-    this->temp_source_select_->add_on_state_callback([this](const std::string &value, size_t index) {
-        if (value == this->temp_source_state_)
-            return;
-        this->on_temp_source_change(value);
-    });
-}
-
-void SinclairAC::set_atc_mac_address_text(text::Text *atc_mac_address_text)
-{
-    this->atc_mac_address_text_ = atc_mac_address_text;
-}
-
-void SinclairAC::set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor)
-{
-    this->ac_indoor_temp_sensor_ = ac_indoor_temp_sensor;
-}
-
-void SinclairAC::set_atc_room_temp_sensor(sensor::Sensor *atc_room_temp_sensor)
-{
-    this->atc_room_temp_sensor_ = atc_room_temp_sensor;
-}
-
-void SinclairAC::set_atc_room_humidity_sensor(sensor::Sensor *atc_room_humidity_sensor)
-{
-    this->atc_room_humidity_sensor_ = atc_room_humidity_sensor;
-}
-
 void SinclairAC::set_plasma_switch(switch_::Switch *plasma_switch)
 {
     this->plasma_switch_ = plasma_switch;
@@ -399,68 +353,6 @@ void SinclairAC::set_save_switch(switch_::Switch *save_switch)
             return;
         this->on_save_change(state);
     });
-}
-
-/*
- * ATC Sensor timeout check and fallback logic
- */
-
-void SinclairAC::check_atc_sensor_timeout()
-{
-    // Only check if we're using external ATC sensor
-    if (!is_using_atc_sensor()) {
-        return;
-    }
-
-    // Check if MAC address is valid (not empty)
-    if (this->atc_mac_address_text_ == nullptr || this->atc_mac_address_text_->state.empty()) {
-        if (this->atc_sensor_valid_) {
-            ESP_LOGW(TAG, "ATC MAC address is empty, falling back to AC own sensor");
-            this->temp_source_state_ = temp_source_options::AC_OWN;
-            this->update_temp_source(this->temp_source_state_);
-            this->atc_sensor_valid_ = false;
-        }
-        return;
-    }
-
-    // Check if sensor has timed out (15 minutes)
-    if (this->atc_sensor_valid_ && this->last_atc_sensor_update_ > 0) {
-        uint32_t time_since_update = millis() - this->last_atc_sensor_update_;
-        if (time_since_update > ATC_SENSOR_TIMEOUT_MS) {
-            ESP_LOGW(TAG, "ATC sensor timeout (no data for 15 minutes), falling back to AC own sensor");
-            this->temp_source_state_ = temp_source_options::AC_OWN;
-            this->update_temp_source(this->temp_source_state_);
-            this->atc_sensor_valid_ = false;
-        }
-    }
-}
-
-void SinclairAC::update_atc_sensor(float temperature, float humidity)
-{
-    this->last_atc_sensor_update_ = millis();
-    this->last_atc_temperature_ = temperature;
-    this->last_atc_humidity_ = humidity;
-    this->atc_sensor_valid_ = true;
-
-    // Publish to sensors if they exist
-    if (this->atc_room_temp_sensor_ != nullptr) {
-        this->atc_room_temp_sensor_->publish_state(temperature);
-    }
-
-    if (this->atc_room_humidity_sensor_ != nullptr) {
-        this->atc_room_humidity_sensor_->publish_state(humidity);
-    }
-
-    // Update current temperature if using ATC sensor
-    if (is_using_atc_sensor()) {
-        this->current_temperature = temperature;
-        this->publish_state();
-    }
-}
-
-bool SinclairAC::is_using_atc_sensor()
-{
-    return this->temp_source_state_ == temp_source_options::EXTERNAL_ATC;
 }
 
 /*

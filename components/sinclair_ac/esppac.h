@@ -5,7 +5,6 @@
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
-#include "esphome/components/text/text.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/component.h"
 
@@ -13,7 +12,7 @@ namespace esphome {
 
 namespace sinclair_ac {
 
-static const char *const VERSION = "0.0.2";
+static const char *const VERSION = "0.0.1";
 
 static const uint8_t READ_TIMEOUT = 20;  // The maximum time to wait before considering a packet complete
 
@@ -22,8 +21,6 @@ static const uint8_t MAX_TEMPERATURE = 30;   // Maximum temperature as supported
 static const float TEMPERATURE_STEP = 0.5;   // Steps the temperature can be set in
 static const float TEMPERATURE_TOLERANCE = 1;  // The tolerance to allow when checking the climate state
 static const uint8_t TEMPERATURE_THRESHOLD = 100;  // Maximum temperature the AC can report (formally 119.5 for sinclair protocol, but 100 is impossible, soo...)
-
-static const uint32_t ATC_SENSOR_TIMEOUT_MS = 900000;  // 15 minutes in milliseconds
 
 namespace fan_modes{
     const std::string FAN_AUTO  = "0 - Auto";
@@ -78,12 +75,6 @@ namespace display_unit_options{
     const std::string DEGF = "F";
 }
 
-/* this must be same as TEMP_SOURCE_OPTIONS in climate.py */
-namespace temp_source_options{
-    const std::string AC_OWN = "AC Own Sensor";
-    const std::string EXTERNAL_ATC = "External ATC Sensor";
-}
-
 typedef enum {
         STATE_WAIT_SYNC,
         STATE_RECIEVE,
@@ -107,7 +98,6 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
 
         void set_display_select(select::Select *display_select);
         void set_display_unit_select(select::Select *display_unit_select);
-        void set_temp_source_select(select::Select *temp_source_select);
 
         void set_plasma_switch(switch_::Switch *plasma_switch);
         void set_beeper_switch(switch_::Switch *beeper_switch);
@@ -116,10 +106,6 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void set_save_switch(switch_::Switch *plasma_switch);
 
         void set_current_temperature_sensor(sensor::Sensor *current_temperature_sensor);
-        void set_atc_mac_address_text(text::Text *atc_mac_address_text);
-        void set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor);
-        void set_atc_room_temp_sensor(sensor::Sensor *atc_room_temp_sensor);
-        void set_atc_room_humidity_sensor(sensor::Sensor *atc_room_humidity_sensor);
 
         void setup() override;
         void loop() override;
@@ -130,7 +116,6 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
 
         select::Select *display_select_          = nullptr; /* Select for setting display mode */
         select::Select *display_unit_select_     = nullptr; /* Select for setting display temperature unit */
-        select::Select *temp_source_select_      = nullptr; /* Select for temperature source (AC own or external ATC) */
 
         switch_::Switch *plasma_switch_          = nullptr; /* Switch for plasma */
         switch_::Switch *beeper_switch_          = nullptr; /* Switch for beeper */
@@ -139,28 +124,18 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         switch_::Switch *save_switch_            = nullptr; /* Switch for save */
 
         sensor::Sensor *current_temperature_sensor_ = nullptr; /* If user wants to replace reported temperature by an external sensor readout */
-        text::Text *atc_mac_address_text_        = nullptr; /* Text input for ATC MAC address */
-        sensor::Sensor *ac_indoor_temp_sensor_   = nullptr; /* AC indoor temperature sensor for HA display */
-        sensor::Sensor *atc_room_temp_sensor_    = nullptr; /* ATC room temperature sensor */
-        sensor::Sensor *atc_room_humidity_sensor_ = nullptr; /* ATC room humidity sensor */
 
         std::string vertical_swing_state_;
         std::string horizontal_swing_state_;
 
         std::string display_state_;
         std::string display_unit_state_;
-        std::string temp_source_state_;
 
         bool plasma_state_;
         bool beeper_state_;
         bool sleep_state_;
         bool xfan_state_;
         bool save_state_;
-
-        uint32_t last_atc_sensor_update_ = 0;  /* Timestamp of last ATC sensor update */
-        bool atc_sensor_valid_ = false;         /* Flag indicating if ATC sensor data is valid */
-        float last_atc_temperature_ = 0;        /* Last received ATC temperature */
-        float last_atc_humidity_ = 0;           /* Last received ATC humidity */
 
         SerialProcess_t serialProcess_;
 
@@ -186,7 +161,6 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
 
         void update_display(const std::string &display);
         void update_display_unit(const std::string &display_unit);
-        void update_temp_source(const std::string &temp_source);
 
         void update_plasma(bool plasma);
         void update_beeper(bool beeper);
@@ -194,16 +168,11 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void update_xfan(bool xfan);
         void update_save(bool save);
 
-        void check_atc_sensor_timeout();
-        void update_atc_sensor(float temperature, float humidity);
-        bool is_using_atc_sensor();
-
         virtual void on_horizontal_swing_change(const std::string &swing) = 0;
         virtual void on_vertical_swing_change(const std::string &swing) = 0;
 
         virtual void on_display_change(const std::string &display) = 0;
         virtual void on_display_unit_change(const std::string &display_unit) = 0;
-        virtual void on_temp_source_change(const std::string &temp_source) = 0;
 
         virtual void on_plasma_change(bool plasma) = 0;
         virtual void on_beeper_change(bool beeper) = 0;
