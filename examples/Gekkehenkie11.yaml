@@ -9,8 +9,10 @@ esphome:
   name: gree
   friendly_name: "Gree AC"
 
-esp8266:
-  board: esp01_1m
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
 
 # Enable Home Assistant API
 api:
@@ -45,9 +47,9 @@ uart:
 
 # Note: For BLE ATC sensor support with built-in listener, you need ESP32.
 # Uncomment the following section if using ESP32 instead of ESP8266:
-# esp32_ble_tracker:
-#   scan_parameters:
-#     active: false
+esp32_ble_tracker:
+  scan_parameters:
+    active: false
 
 time:
   - platform: sntp
