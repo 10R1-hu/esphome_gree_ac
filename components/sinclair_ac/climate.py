@@ -45,6 +45,7 @@ CONF_ATC_MAC_ADDRESS_TEXT       = "atc_mac_address_text"
 CONF_AC_INDOOR_TEMP_SENSOR      = "ac_indoor_temp_sensor"
 CONF_ATC_ROOM_TEMP_SENSOR       = "atc_room_temp_sensor"
 CONF_ATC_ROOM_HUMIDITY_SENSOR   = "atc_room_humidity_sensor"
+CONF_ATC_BATTERY_SENSOR         = "atc_battery_sensor"
 
 HORIZONTAL_SWING_OPTIONS = [
     "0 - OFF",
@@ -110,6 +111,7 @@ SCHEMA = climate.climate_schema(SinclairACCNT).extend(
         cv.Optional(CONF_AC_INDOOR_TEMP_SENSOR): sensor.sensor_schema(),
         cv.Optional(CONF_ATC_ROOM_TEMP_SENSOR): sensor.sensor_schema(),
         cv.Optional(CONF_ATC_ROOM_HUMIDITY_SENSOR): sensor.sensor_schema(),
+        cv.Optional(CONF_ATC_BATTERY_SENSOR): sensor.sensor_schema(),
     }
 ).extend(uart.UART_DEVICE_SCHEMA)
 
@@ -183,6 +185,11 @@ async def to_code(config):
         conf = config[CONF_ATC_ROOM_HUMIDITY_SENSOR]
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_atc_room_humidity_sensor(sens))
+
+    if CONF_ATC_BATTERY_SENSOR in config:
+        conf = config[CONF_ATC_BATTERY_SENSOR]
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_atc_battery_sensor(sens))
         
     for s in [CONF_PLASMA_SWITCH, CONF_BEEPER_SWITCH, CONF_SLEEP_SWITCH, CONF_XFAN_SWITCH, CONF_SAVE_SWITCH]:
         if s in config:

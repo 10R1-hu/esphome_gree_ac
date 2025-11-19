@@ -49,6 +49,16 @@ void SinclairAC::setup()
     this->temp_source_state_ = temp_source_options::AC_OWN;
 
     ESP_LOGI(TAG, "Sinclair AC component v%s starting...", VERSION);
+
+#ifdef USE_ESP32_BLE_TRACKER
+    // Register BLE device listener for ATC sensor
+    if (esp32_ble_tracker::global_esp32_ble_tracker != nullptr) {
+        esp32_ble_tracker::global_esp32_ble_tracker->register_listener(this);
+        ESP_LOGI(TAG, "BLE tracker listener registered for dynamic ATC sensor support");
+    } else {
+        ESP_LOGW(TAG, "BLE tracker not available - ATC sensor support disabled");
+    }
+#endif
 }
 
 void SinclairAC::loop()
@@ -351,6 +361,11 @@ void SinclairAC::set_atc_room_humidity_sensor(sensor::Sensor *atc_room_humidity_
     this->atc_room_humidity_sensor_ = atc_room_humidity_sensor;
 }
 
+void SinclairAC::set_atc_battery_sensor(sensor::Sensor *atc_battery_sensor)
+{
+    this->atc_battery_sensor_ = atc_battery_sensor;
+}
+
 void SinclairAC::set_plasma_switch(switch_::Switch *plasma_switch)
 {
     this->plasma_switch_ = plasma_switch;
@@ -462,6 +477,115 @@ bool SinclairAC::is_using_atc_sensor()
 {
     return this->temp_source_state_ == temp_source_options::EXTERNAL_ATC;
 }
+
+void SinclairAC::update_atc_battery(float battery_percent)
+{
+    this->last_atc_battery_ = battery_percent;
+    
+    // Publish to battery sensor if it exists
+    if (this->atc_battery_sensor_ != nullptr) {
+        this->atc_battery_sensor_->publish_state(battery_percent);
+    }
+}
+
+#ifdef USE_ESP32_BLE_TRACKER
+/*
+ * BLE Advertisement parsing for ATC (Xiaomi ATC1441 custom firmware)
+ */
+
+std::string SinclairAC::normalize_mac_(const std::string &mac)
+{
+    std::string normalized;
+    for (char c : mac) {
+        if (c != ':' && c != '-' && c != ' ') {
+            normalized += std::toupper(c);
+        }
+    }
+    return normalized;
+}
+
+bool SinclairAC::macs_equal_(const std::string &mac1, const std::string &mac2)
+{
+    return normalize_mac_(mac1) == normalize_mac_(mac2);
+}
+
+bool SinclairAC::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
+{
+    // Only process if we have a MAC address configured
+    if (this->atc_mac_address_text_ == nullptr || this->atc_mac_address_text_->state.empty()) {
+        return false;
+    }
+
+    std::string configured_mac = this->atc_mac_address_text_->state;
+    
+    // Check if advertiser address matches
+    std::string device_mac = device.address_str();
+    bool mac_matches = macs_equal_(device_mac, configured_mac);
+    
+    // Look for ATC custom firmware service data (UUID 0x181A - Environmental Sensing)
+    for (auto &service_data : device.get_service_datas()) {
+        if (service_data.uuid.get_uuid().len != ESP_UUID_LEN_16) {
+            continue;
+        }
+        
+        uint16_t uuid = service_data.uuid.get_uuid().uuid.uuid16;
+        if (uuid != 0x181A) {
+            continue;
+        }
+        
+        const auto &data = service_data.data;
+        
+        // ATC format: minimum 13 bytes
+        // Bytes 0-5: MAC (reversed)
+        // Bytes 6-7: Temperature in centi-degrees C (int16, big-endian)
+        // Bytes 8-9: Humidity in centi-% (uint16, big-endian)
+        // Byte 10: Battery %
+        // Bytes 11-12: Battery mV (optional)
+        // Byte 13: Packet counter (optional)
+        
+        if (data.size() < 11) {
+            continue;
+        }
+        
+        // Check embedded MAC if present (first 6 bytes, reversed order)
+        if (data.size() >= 6) {
+            char embedded_mac[18];
+            snprintf(embedded_mac, sizeof(embedded_mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+                     data[5], data[4], data[3], data[2], data[1], data[0]);
+            
+            if (macs_equal_(embedded_mac, configured_mac)) {
+                mac_matches = true;
+            }
+        }
+        
+        if (!mac_matches) {
+            continue;
+        }
+        
+        // Parse temperature (int16, big-endian, in centi-degrees C)
+        int16_t temp_raw = (int16_t)((data[6] << 8) | data[7]);
+        float temperature = temp_raw / 100.0f;
+        
+        // Parse humidity (uint16, big-endian, in centi-%)
+        uint16_t hum_raw = (uint16_t)((data[8] << 8) | data[9]);
+        float humidity = hum_raw / 100.0f;
+        
+        // Parse battery percentage
+        uint8_t battery = data[10];
+        
+        ESP_LOGD(TAG, "ATC BLE data received from %s: Temp=%.2f°C, Hum=%.1f%%, Batt=%d%%",
+                 device_mac.c_str(), temperature, humidity, battery);
+        
+        // Update sensors
+        update_atc_sensor(temperature, humidity);
+        update_atc_battery((float)battery);
+        
+        return true;
+    }
+    
+    return false;
+}
+#endif
 
 /*
  * Debugging

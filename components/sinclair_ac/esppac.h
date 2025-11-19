@@ -9,6 +9,10 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/component.h"
 
+#ifdef USE_ESP32_BLE_TRACKER
+#include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
+#endif
+
 namespace esphome {
 
 namespace sinclair_ac {
@@ -100,7 +104,11 @@ typedef struct {
         SerialProcessState_t state;
 } SerialProcess_t;
 
-class SinclairAC : public Component, public uart::UARTDevice, public climate::Climate {
+class SinclairAC : public Component, public uart::UARTDevice, public climate::Climate
+#ifdef USE_ESP32_BLE_TRACKER
+    , public esp32_ble_tracker::ESPBTDeviceListener
+#endif
+{
     public:
         void set_vertical_swing_select(select::Select *vertical_swing_select);
         void set_horizontal_swing_select(select::Select *horizontal_swing_select);
@@ -120,6 +128,7 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor);
         void set_atc_room_temp_sensor(sensor::Sensor *atc_room_temp_sensor);
         void set_atc_room_humidity_sensor(sensor::Sensor *atc_room_humidity_sensor);
+        void set_atc_battery_sensor(sensor::Sensor *atc_battery_sensor);
 
         void setup() override;
         void loop() override;
@@ -143,6 +152,7 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         sensor::Sensor *ac_indoor_temp_sensor_   = nullptr; /* AC indoor temperature sensor for HA display */
         sensor::Sensor *atc_room_temp_sensor_    = nullptr; /* ATC room temperature sensor */
         sensor::Sensor *atc_room_humidity_sensor_ = nullptr; /* ATC room humidity sensor */
+        sensor::Sensor *atc_battery_sensor_      = nullptr; /* ATC battery sensor */
 
         std::string vertical_swing_state_;
         std::string horizontal_swing_state_;
@@ -161,6 +171,7 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         bool atc_sensor_valid_ = false;         /* Flag indicating if ATC sensor data is valid */
         float last_atc_temperature_ = 0;        /* Last received ATC temperature */
         float last_atc_humidity_ = 0;           /* Last received ATC humidity */
+        float last_atc_battery_ = 0;            /* Last received ATC battery percentage */
 
         SerialProcess_t serialProcess_;
 
@@ -196,7 +207,14 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
 
         void check_atc_sensor_timeout();
         void update_atc_sensor(float temperature, float humidity);
+        void update_atc_battery(float battery_percent);
         bool is_using_atc_sensor();
+
+#ifdef USE_ESP32_BLE_TRACKER
+        bool parse_device(const esp32_ble_tracker::ESPBTDevice &device) override;
+        std::string normalize_mac_(const std::string &mac);
+        bool macs_equal_(const std::string &mac1, const std::string &mac2);
+#endif
 
         virtual void on_horizontal_swing_change(const std::string &swing) = 0;
         virtual void on_vertical_swing_change(const std::string &swing) = 0;

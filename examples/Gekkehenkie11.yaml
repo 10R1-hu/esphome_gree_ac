@@ -43,6 +43,12 @@ uart:
   baud_rate: 4800
   parity: EVEN
 
+# Note: For BLE ATC sensor support with built-in listener, you need ESP32.
+# Uncomment the following section if using ESP32 instead of ESP8266:
+# esp32_ble_tracker:
+#   scan_parameters:
+#     active: false
+
 time:
   - platform: sntp
 
@@ -94,5 +100,11 @@ climate:
       unit_of_measurement: "%"
       accuracy_decimals: 1
       device_class: humidity
+      state_class: measurement
+    atc_battery_sensor:
+      name: ${devicename} ATC Battery
+      unit_of_measurement: "%"
+      accuracy_decimals: 0
+      device_class: battery
       state_class: measurement
     
