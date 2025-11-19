@@ -120,6 +120,123 @@ climate:
 - This feature works universally across all rooms and sensors in your setup
 - **ESP8266 compatibility**: If using ESP8266, the BLE listener is automatically disabled, and the component continues to work without ATC support
 
+## BLE Requirements
+
+The external ATC sensor feature requires **ESP32** hardware. ESP8266 does not support Bluetooth Low Energy (BLE) and cannot use this feature.
+
+### Hardware Requirements:
+- **ESP32**: Required for BLE functionality (e.g., ESP32-DevKit, ESP32-WROOM, ESP01-M with ESP32)
+- **ESP8266**: Does NOT support BLE - the component will work but without external ATC sensor support
+
+### Configuration Requirements:
+In your ESPHome YAML configuration, you must:
+
+1. **Use ESP32 platform**:
+```yaml
+esp32:
+  board: esp32dev  # or your specific ESP32 board
+  framework:
+    type: esp-idf  # or arduino
+```
+
+2. **Enable BLE tracker**:
+```yaml
+esp32_ble_tracker:
+  scan_parameters:
+    active: false
+```
+
+Without the `esp32_ble_tracker` component enabled, the ATC sensor listener will not function, and you'll see a warning in the logs at startup.
+
+## Debug Logging & Verbose Mode
+
+The component includes comprehensive logging to help troubleshoot issues and understand system behavior.
+
+### Log Levels
+
+| Level | Description | Use Case |
+|-------|-------------|----------|
+| `ERROR` | Critical errors only | Production - minimal logging |
+| `WARN` | Warnings and errors | Production - recommended default |
+| `INFO` | General information | Normal operation visibility |
+| `DEBUG` | Detailed debugging info | Troubleshooting and development |
+| `VERBOSE` | Very detailed logs | Deep debugging (not recommended for production) |
+
+### Configuring Log Level
+
+Set the logger level in your ESPHome YAML:
+
+```yaml
+logger:
+  baud_rate: 0  # disable UART logging (UART used for AC communication)
+  level: DEBUG  # Set to DEBUG for troubleshooting
+```
+
+**Recommendation**: Use `DEBUG` level during initial setup and troubleshooting. Once stable, change to `INFO` or `WARN` for production use to reduce log clutter.
+
+### Verbose Mode (Advanced)
+
+For even more detailed logging, you can enable **verbose mode** by defining the `SINCLAIR_AC_VERBOSE_LOG` macro. This adds extra ESP_LOGV statements that show:
+
+- Raw BLE packet data and parsing details
+- Timestamp information for sensor updates
+- MAC address matching attempts
+- Internal state transitions
+
+#### Enabling Verbose Mode
+
+Add the following to your ESPHome YAML configuration:
+
+```yaml
+esphome:
+  name: your_ac_name
+  platformio_options:
+    build_flags:
+      - -DSINCLAIR_AC_VERBOSE_LOG
+```
+
+**Note**: This significantly increases log output and should only be used for deep debugging. The verbose logs require logger level to be set to `VERBOSE`:
+
+```yaml
+logger:
+  level: VERBOSE
+```
+
+### What Gets Logged at DEBUG Level
+
+With `level: DEBUG`, you'll see:
+- Component startup and version information
+- BLE tracker registration status
+- Temperature source changes (AC own sensor ↔ External ATC sensor)
+- ATC sensor data updates (temperature, humidity, battery)
+- Automatic fallback events when ATC sensor times out
+- MAC address validation results
+- User-initiated changes via Home Assistant UI
+
+### What Gets Logged at VERBOSE Level (with macro)
+
+With `SINCLAIR_AC_VERBOSE_LOG` defined and `level: VERBOSE`:
+- Raw BLE advertisement data and parsing
+- Detailed MAC address comparison logic
+- Sensor update timestamps
+- Individual sensor publication events
+- All DEBUG level logs plus extra verbose details
+
+### Example Debug Output
+
+With `level: DEBUG`:
+```
+[D][sinclair_ac:51] Sinclair AC component v0.0.3 starting...
+[I][sinclair_ac:57] BLE tracker listener registered for dynamic ATC sensor support
+[D][sinclair_ac:48] Temperature source initialized to: AC Own Sensor
+[D][sinclair_ac:576] ATC BLE data received from AA:BB:CC:DD:EE:FF: Temp=22.45°C, Hum=55.2%, Batt=87%
+[D][sinclair_ac:454] ATC sensor data updated: Temp=22.45°C, Humidity=55.2%
+[D][sinclair_ac:340] User changed temperature source via UI to: External ATC Sensor
+[D][sinclair_ac:201] Temperature source changing from 'AC Own Sensor' to 'External ATC Sensor'
+```
+
+
+
 # HOW TO 
 You can flash this to an ESP module. I used an ESP01-M module, like this one:
 https://nl.aliexpress.com/item/1005008528226032.html

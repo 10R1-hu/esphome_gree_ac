@@ -35,9 +35,10 @@ wifi:
 captive_portal:
 
 # Enable logging
+# Set to DEBUG level for troubleshooting. Lower to INFO or WARN for production.
 logger:
   baud_rate: 0 # disable LOG output on UART as UART is used for Sinclair AC unit
-  level: VERBOSE
+  level: DEBUG
 
 uart:
   tx_pin: 1
@@ -45,8 +46,8 @@ uart:
   baud_rate: 4800
   parity: EVEN
 
-# Note: For BLE ATC sensor support with built-in listener, you need ESP32.
-# Uncomment the following section if using ESP32 instead of ESP8266:
+# BLE tracker required for ATC sensor support (ESP32 only - not compatible with ESP8266)
+# This enables external Xiaomi ATC thermometer/hygrometer as temperature source
 esp32_ble_tracker:
   scan_parameters:
     active: false
@@ -70,6 +71,7 @@ climate:
       name: ${devicename} Display Mode
     display_unit_select:
       name: ${devicename} Display Unit
+    # Persistent after restart - allows switching between AC sensor and external ATC sensor
     temp_source_select:
       name: ${devicename} Temperature Source
     plasma_switch:
@@ -82,9 +84,12 @@ climate:
       name: ${devicename} X-fan
     save_switch:
       name: ${devicename} Save/8 Heat
+    # BLE sensor MAC address - Persistent after restart (format: AA:BB:CC:DD:EE:FF)
     atc_mac_address_text:
       name: ${devicename} ATC MAC Address
       mode: text
+      # Uncomment to persist MAC address across reboots:
+      # restore_value: true
     ac_indoor_temp_sensor:
       name: ${devicename} AC Indoor Temperature
       unit_of_measurement: "°C"

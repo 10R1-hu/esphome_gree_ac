@@ -17,7 +17,7 @@ namespace esphome {
 
 namespace sinclair_ac {
 
-static const char *const VERSION = "0.0.2";
+static const char *const VERSION = "0.0.3";
 
 static const uint8_t READ_TIMEOUT = 20;  // The maximum time to wait before considering a packet complete
 

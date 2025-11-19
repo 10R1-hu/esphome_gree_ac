@@ -47,6 +47,7 @@ void SinclairAC::setup()
 
     // Initialize temperature source to AC own sensor by default
     this->temp_source_state_ = temp_source_options::AC_OWN;
+    ESP_LOGD(TAG, "Temperature source initialized to: %s", this->temp_source_state_.c_str());
 
     ESP_LOGI(TAG, "Sinclair AC component v%s starting...", VERSION);
 
@@ -58,6 +59,8 @@ void SinclairAC::setup()
     } else {
         ESP_LOGW(TAG, "BLE tracker not available - ATC sensor support disabled");
     }
+#else
+    ESP_LOGD(TAG, "BLE tracker not compiled - ATC sensor support not available");
 #endif
 }
 
@@ -199,6 +202,9 @@ void SinclairAC::update_display_unit(const std::string &display_unit)
 
 void SinclairAC::update_temp_source(const std::string &temp_source)
 {
+    ESP_LOGD(TAG, "Temperature source changing from '%s' to '%s'", 
+             this->temp_source_state_.c_str(), temp_source.c_str());
+    
     this->temp_source_state_ = temp_source;
 
     if (this->temp_source_select_ != nullptr && 
@@ -337,6 +343,7 @@ void SinclairAC::set_temp_source_select(select::Select *temp_source_select)
     this->temp_source_select_->add_on_state_callback([this](const std::string &value, size_t index) {
         if (value == this->temp_source_state_)
             return;
+        ESP_LOGD(TAG, "User changed temperature source via UI to: %s", value.c_str());
         this->on_temp_source_change(value);
     });
 }
@@ -344,6 +351,7 @@ void SinclairAC::set_temp_source_select(select::Select *temp_source_select)
 void SinclairAC::set_atc_mac_address_text(text::Text *atc_mac_address_text)
 {
     this->atc_mac_address_text_ = atc_mac_address_text;
+    ESP_LOGD(TAG, "ATC MAC address text input registered");
 }
 
 void SinclairAC::set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor)
@@ -431,6 +439,7 @@ void SinclairAC::check_atc_sensor_timeout()
     if (this->atc_mac_address_text_ == nullptr || this->atc_mac_address_text_->state.empty()) {
         if (this->atc_sensor_valid_) {
             ESP_LOGW(TAG, "ATC MAC address is empty, falling back to AC own sensor");
+            ESP_LOGD(TAG, "Fallback trigger: Empty MAC address");
             this->temp_source_state_ = temp_source_options::AC_OWN;
             this->update_temp_source(this->temp_source_state_);
             this->atc_sensor_valid_ = false;
@@ -443,6 +452,7 @@ void SinclairAC::check_atc_sensor_timeout()
         uint32_t time_since_update = millis() - this->last_atc_sensor_update_;
         if (time_since_update > ATC_SENSOR_TIMEOUT_MS) {
             ESP_LOGW(TAG, "ATC sensor timeout (no data for 15 minutes), falling back to AC own sensor");
+            ESP_LOGD(TAG, "Fallback trigger: Timeout after %lu ms", time_since_update);
             this->temp_source_state_ = temp_source_options::AC_OWN;
             this->update_temp_source(this->temp_source_state_);
             this->atc_sensor_valid_ = false;
@@ -457,17 +467,29 @@ void SinclairAC::update_atc_sensor(float temperature, float humidity)
     this->last_atc_humidity_ = humidity;
     this->atc_sensor_valid_ = true;
 
+    ESP_LOGD(TAG, "ATC sensor data updated: Temp=%.2f°C, Humidity=%.1f%%", temperature, humidity);
+#ifdef SINCLAIR_AC_VERBOSE_LOG
+    ESP_LOGV(TAG, "ATC sensor update timestamp: %lu ms", this->last_atc_sensor_update_);
+#endif
+
     // Publish to sensors if they exist
     if (this->atc_room_temp_sensor_ != nullptr) {
         this->atc_room_temp_sensor_->publish_state(temperature);
+#ifdef SINCLAIR_AC_VERBOSE_LOG
+        ESP_LOGV(TAG, "Published ATC temperature to sensor: %.2f°C", temperature);
+#endif
     }
 
     if (this->atc_room_humidity_sensor_ != nullptr) {
         this->atc_room_humidity_sensor_->publish_state(humidity);
+#ifdef SINCLAIR_AC_VERBOSE_LOG
+        ESP_LOGV(TAG, "Published ATC humidity to sensor: %.1f%%", humidity);
+#endif
     }
 
     // Update current temperature if using ATC sensor
     if (is_using_atc_sensor()) {
+        ESP_LOGD(TAG, "Updating climate current temperature from ATC sensor: %.2f°C", temperature);
         this->current_temperature = temperature;
         this->publish_state();
     }
@@ -481,6 +503,8 @@ bool SinclairAC::is_using_atc_sensor()
 void SinclairAC::update_atc_battery(float battery_percent)
 {
     this->last_atc_battery_ = battery_percent;
+    
+    ESP_LOGD(TAG, "ATC battery updated: %.0f%%", battery_percent);
     
     // Publish to battery sensor if it exists
     if (this->atc_battery_sensor_ != nullptr) {
@@ -513,6 +537,9 @@ bool SinclairAC::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
 {
     // Only process if we have a MAC address configured
     if (this->atc_mac_address_text_ == nullptr || this->atc_mac_address_text_->state.empty()) {
+#ifdef SINCLAIR_AC_VERBOSE_LOG
+        ESP_LOGV(TAG, "No ATC MAC address configured, skipping BLE device");
+#endif
         return false;
     }
 
@@ -521,6 +548,13 @@ bool SinclairAC::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
     // Check if advertiser address matches
     std::string device_mac = device.address_str();
     bool mac_matches = macs_equal_(device_mac, configured_mac);
+    
+#ifdef SINCLAIR_AC_VERBOSE_LOG
+    if (!mac_matches) {
+        ESP_LOGV(TAG, "BLE device MAC %s doesn't match configured %s", 
+                 device_mac.c_str(), configured_mac.c_str());
+    }
+#endif
     
     // Look for ATC custom firmware service data (UUID 0x181A - Environmental Sensing)
     for (auto &service_data : device.get_service_datas()) {
@@ -544,6 +578,9 @@ bool SinclairAC::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
         // Byte 13: Packet counter (optional)
         
         if (data.size() < 11) {
+#ifdef SINCLAIR_AC_VERBOSE_LOG
+            ESP_LOGV(TAG, "ATC service data too short: %d bytes (need 11)", data.size());
+#endif
             continue;
         }
         
@@ -555,7 +592,14 @@ bool SinclairAC::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
             
             if (macs_equal_(embedded_mac, configured_mac)) {
                 mac_matches = true;
+                ESP_LOGD(TAG, "ATC MAC match found (embedded): %s", embedded_mac);
             }
+#ifdef SINCLAIR_AC_VERBOSE_LOG
+            else {
+                ESP_LOGV(TAG, "Embedded MAC %s doesn't match configured %s", 
+                         embedded_mac, configured_mac.c_str());
+            }
+#endif
         }
         
         if (!mac_matches) {
@@ -575,6 +619,9 @@ bool SinclairAC::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
         
         ESP_LOGD(TAG, "ATC BLE data received from %s: Temp=%.2f°C, Hum=%.1f%%, Batt=%d%%",
                  device_mac.c_str(), temperature, humidity, battery);
+#ifdef SINCLAIR_AC_VERBOSE_LOG
+        ESP_LOGV(TAG, "Raw ATC data: temp_raw=%d, hum_raw=%d, battery=%d", temp_raw, hum_raw, battery);
+#endif
         
         // Update sensors
         update_atc_sensor(temperature, humidity);
