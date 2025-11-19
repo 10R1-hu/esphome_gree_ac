@@ -50,6 +50,22 @@ void SinclairAC::setup()
 
     ESP_LOGI(TAG, "Sinclair AC component v%s starting...", VERSION);
 
+    // Initialize preference objects
+    this->pref_display_ = global_preferences->make_preference<std::string>(fnv1_hash("sinclair_ac/display"));
+    this->pref_display_unit_ = global_preferences->make_preference<std::string>(fnv1_hash("sinclair_ac/display_unit"));
+    this->pref_vertical_swing_ = global_preferences->make_preference<std::string>(fnv1_hash("sinclair_ac/vswing"));
+    this->pref_horizontal_swing_ = global_preferences->make_preference<std::string>(fnv1_hash("sinclair_ac/hswing"));
+    this->pref_temp_source_ = global_preferences->make_preference<std::string>(fnv1_hash("sinclair_ac/temp_source"));
+    this->pref_plasma_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_ac/plasma"));
+    this->pref_beeper_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_ac/beeper"));
+    this->pref_sleep_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_ac/sleep"));
+    this->pref_xfan_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_ac/xfan"));
+    this->pref_save_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_ac/save"));
+    this->pref_atc_mac_ = global_preferences->make_preference<std::string>(fnv1_hash("sinclair_ac/atc_mac"));
+
+    // Load persisted preferences
+    load_preferences_();
+
 #ifdef USE_ESP32_BLE_TRACKER
     // Register BLE device listener for ATC sensor
     if (esp32_ble_tracker::global_esp32_ble_tracker != nullptr) {
@@ -162,6 +178,9 @@ void SinclairAC::update_swing_horizontal(const std::string &swing)
     {
         this->horizontal_swing_select_->publish_state(this->horizontal_swing_state_);
     }
+    
+    // Save preference
+    this->pref_horizontal_swing_.save(&this->horizontal_swing_state_);
 }
 
 void SinclairAC::update_swing_vertical(const std::string &swing)
@@ -173,6 +192,9 @@ void SinclairAC::update_swing_vertical(const std::string &swing)
     {
         this->vertical_swing_select_->publish_state(this->vertical_swing_state_);
     }
+    
+    // Save preference
+    this->pref_vertical_swing_.save(&this->vertical_swing_state_);
 }
 
 void SinclairAC::update_display(const std::string &display)
@@ -184,6 +206,9 @@ void SinclairAC::update_display(const std::string &display)
     {
         this->display_select_->publish_state(this->display_state_);
     }
+    
+    // Save preference
+    this->pref_display_.save(&this->display_state_);
 }
 
 void SinclairAC::update_display_unit(const std::string &display_unit)
@@ -195,6 +220,9 @@ void SinclairAC::update_display_unit(const std::string &display_unit)
     {
         this->display_unit_select_->publish_state(this->display_unit_state_);
     }
+    
+    // Save preference
+    this->pref_display_unit_.save(&this->display_unit_state_);
 }
 
 void SinclairAC::update_temp_source(const std::string &temp_source)
@@ -206,6 +234,9 @@ void SinclairAC::update_temp_source(const std::string &temp_source)
     {
         this->temp_source_select_->publish_state(this->temp_source_state_);
     }
+    
+    // Save preference
+    this->pref_temp_source_.save(&this->temp_source_state_);
 }
 
 void SinclairAC::update_plasma(bool plasma)
@@ -216,6 +247,9 @@ void SinclairAC::update_plasma(bool plasma)
     {
         this->plasma_switch_->publish_state(this->plasma_state_);
     }
+    
+    // Save preference
+    this->pref_plasma_.save(&this->plasma_state_);
 }
 
 void SinclairAC::update_beeper(bool beeper)
@@ -226,6 +260,9 @@ void SinclairAC::update_beeper(bool beeper)
     {
         this->beeper_switch_->publish_state(this->beeper_state_);
     }
+    
+    // Save preference
+    this->pref_beeper_.save(&this->beeper_state_);
 }
 
 void SinclairAC::update_sleep(bool sleep)
@@ -236,6 +273,9 @@ void SinclairAC::update_sleep(bool sleep)
     {
         this->sleep_switch_->publish_state(this->sleep_state_);
     }
+    
+    // Save preference
+    this->pref_sleep_.save(&this->sleep_state_);
 }
 
 void SinclairAC::update_xfan(bool xfan)
@@ -246,6 +286,9 @@ void SinclairAC::update_xfan(bool xfan)
     {
         this->xfan_switch_->publish_state(this->xfan_state_);
     }
+    
+    // Save preference
+    this->pref_xfan_.save(&this->xfan_state_);
 }
 
 void SinclairAC::update_save(bool save)
@@ -256,6 +299,9 @@ void SinclairAC::update_save(bool save)
     {
         this->save_switch_->publish_state(this->save_state_);
     }
+    
+    // Save preference
+    this->pref_save_.save(&this->save_state_);
 }
 
 climate::ClimateAction SinclairAC::determine_action()
@@ -344,6 +390,16 @@ void SinclairAC::set_temp_source_select(select::Select *temp_source_select)
 void SinclairAC::set_atc_mac_address_text(text::Text *atc_mac_address_text)
 {
     this->atc_mac_address_text_ = atc_mac_address_text;
+    
+    // Add callback to save MAC when it changes
+    this->atc_mac_address_text_->add_on_state_callback([this](const std::string &value) {
+        if (validate_mac_format_(value)) {
+            this->pref_atc_mac_.save(&value);
+            ESP_LOGD(TAG, "ATC MAC address saved: %s", value.c_str());
+        } else if (!value.empty()) {
+            ESP_LOGW(TAG, "Invalid MAC address format: %s (expected AA:BB:CC:DD:EE:FF)", value.c_str());
+        }
+    });
 }
 
 void SinclairAC::set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor)
@@ -486,6 +542,142 @@ void SinclairAC::update_atc_battery(float battery_percent)
     if (this->atc_battery_sensor_ != nullptr) {
         this->atc_battery_sensor_->publish_state(battery_percent);
     }
+}
+
+/*
+ * MAC address validation
+ */
+
+bool SinclairAC::validate_mac_format_(const std::string &mac)
+{
+    if (mac.size() != 17) return false;
+    for (int i = 0; i < 17; i++) {
+        if ((i + 1) % 3 == 0) {
+            if (mac[i] != ':') return false;
+        } else {
+            char c = mac[i];
+            if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) return false;
+        }
+    }
+    return true;
+}
+
+/*
+ * Preference loading
+ */
+
+void SinclairAC::load_preferences_()
+{
+    std::string loaded_display;
+    std::string loaded_display_unit;
+    std::string loaded_vswing;
+    std::string loaded_hswing;
+    std::string loaded_temp_source;
+    std::string loaded_atc_mac;
+    bool loaded_plasma = false;
+    bool loaded_beeper = false;
+    bool loaded_sleep = false;
+    bool loaded_xfan = false;
+    bool loaded_save = false;
+    
+    // Load string preferences
+    if (this->pref_display_.load(&loaded_display)) {
+        if (this->display_select_ != nullptr && loaded_display != this->display_state_) {
+            this->display_state_ = loaded_display;
+            this->display_select_->publish_state(loaded_display);
+        }
+    }
+    
+    if (this->pref_display_unit_.load(&loaded_display_unit)) {
+        if (this->display_unit_select_ != nullptr && loaded_display_unit != this->display_unit_state_) {
+            this->display_unit_state_ = loaded_display_unit;
+            this->display_unit_select_->publish_state(loaded_display_unit);
+        }
+    }
+    
+    if (this->pref_vertical_swing_.load(&loaded_vswing)) {
+        if (this->vertical_swing_select_ != nullptr && loaded_vswing != this->vertical_swing_state_) {
+            this->vertical_swing_state_ = loaded_vswing;
+            this->vertical_swing_select_->publish_state(loaded_vswing);
+        }
+    }
+    
+    if (this->pref_horizontal_swing_.load(&loaded_hswing)) {
+        if (this->horizontal_swing_select_ != nullptr && loaded_hswing != this->horizontal_swing_state_) {
+            this->horizontal_swing_state_ = loaded_hswing;
+            this->horizontal_swing_select_->publish_state(loaded_hswing);
+        }
+    }
+    
+    // Load ATC MAC address
+    if (this->pref_atc_mac_.load(&loaded_atc_mac)) {
+        if (this->atc_mac_address_text_ != nullptr && !loaded_atc_mac.empty()) {
+            if (validate_mac_format_(loaded_atc_mac)) {
+                this->atc_mac_address_text_->publish_state(loaded_atc_mac);
+            } else {
+                ESP_LOGW(TAG, "Persisted ATC MAC has invalid format: %s", loaded_atc_mac.c_str());
+            }
+        }
+    }
+    
+    // Load temperature source
+    if (this->pref_temp_source_.load(&loaded_temp_source)) {
+        // If temp source is External ATC but MAC is invalid/empty, fallback to AC Own
+        if (loaded_temp_source == temp_source_options::EXTERNAL_ATC) {
+            if (this->atc_mac_address_text_ == nullptr || 
+                this->atc_mac_address_text_->state.empty() || 
+                !validate_mac_format_(this->atc_mac_address_text_->state)) {
+                ESP_LOGW(TAG, "Fallback to AC Own Sensor due to invalid or missing ATC MAC");
+                loaded_temp_source = temp_source_options::AC_OWN;
+            }
+        }
+        
+        if (this->temp_source_select_ != nullptr && loaded_temp_source != this->temp_source_state_) {
+            this->temp_source_state_ = loaded_temp_source;
+            this->temp_source_select_->publish_state(loaded_temp_source);
+        }
+    }
+    
+    // Load boolean preferences
+    if (this->pref_plasma_.load(&loaded_plasma)) {
+        if (this->plasma_switch_ != nullptr && loaded_plasma != this->plasma_state_) {
+            this->plasma_state_ = loaded_plasma;
+            this->plasma_switch_->publish_state(loaded_plasma);
+        }
+    }
+    
+    if (this->pref_beeper_.load(&loaded_beeper)) {
+        if (this->beeper_switch_ != nullptr && loaded_beeper != this->beeper_state_) {
+            this->beeper_state_ = loaded_beeper;
+            this->beeper_switch_->publish_state(loaded_beeper);
+        }
+    }
+    
+    if (this->pref_sleep_.load(&loaded_sleep)) {
+        if (this->sleep_switch_ != nullptr && loaded_sleep != this->sleep_state_) {
+            this->sleep_state_ = loaded_sleep;
+            this->sleep_switch_->publish_state(loaded_sleep);
+        }
+    }
+    
+    if (this->pref_xfan_.load(&loaded_xfan)) {
+        if (this->xfan_switch_ != nullptr && loaded_xfan != this->xfan_state_) {
+            this->xfan_state_ = loaded_xfan;
+            this->xfan_switch_->publish_state(loaded_xfan);
+        }
+    }
+    
+    if (this->pref_save_.load(&loaded_save)) {
+        if (this->save_switch_ != nullptr && loaded_save != this->save_state_) {
+            this->save_state_ = loaded_save;
+            this->save_switch_->publish_state(loaded_save);
+        }
+    }
+    
+    ESP_LOGD(TAG, "Loaded persisted display=%s unit=%s hswing=%s vswing=%s temp_source=%s",
+             this->display_state_.c_str(), this->display_unit_state_.c_str(),
+             this->horizontal_swing_state_.c_str(), this->vertical_swing_state_.c_str(),
+             this->temp_source_state_.c_str());
 }
 
 #ifdef USE_ESP32_BLE_TRACKER

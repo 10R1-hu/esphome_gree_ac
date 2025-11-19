@@ -1,4 +1,7 @@
 # Open source WIFI module replacement for Gree protocol based AC's for Home Assistant.
+
+**Version: v0.0.3**
+
 This repository adds support for ESP-based WiFi modules to interface with Gree/Sinclair AC units.
 It's forked from https://github.com/piotrva/esphome_gree_ac, big thanks to @piotrva for his work!
 
@@ -29,6 +32,7 @@ No known problems! if you run into an issue though, please let me know.
 - **Universal External Sensor Support**: Use external ATC BLE temperature/humidity sensors
 - **Robust Temperature Source Selection**: Choose between AC's own sensor or external ATC sensor
 - **Automatic Fallback Logic**: Automatically falls back to AC sensor if external sensor fails or times out
+- **Persistent User Settings**: All user preferences (display mode, swing positions, temperature source, switches, ATC MAC) are automatically saved and restored across reboots
 
 See [FAN_LEVELS.md](FAN_LEVELS.md) for detailed information about fan speed levels.
 

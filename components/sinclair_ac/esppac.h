@@ -8,6 +8,7 @@
 #include "esphome/components/text/text.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/component.h"
+#include "esphome/core/preferences.h"
 
 #ifdef USE_ESP32_BLE_TRACKER
 #include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
@@ -17,7 +18,7 @@ namespace esphome {
 
 namespace sinclair_ac {
 
-static const char *const VERSION = "0.0.2";
+static const char *const VERSION = "0.0.3";
 
 static const uint8_t READ_TIMEOUT = 20;  // The maximum time to wait before considering a packet complete
 
@@ -209,6 +210,21 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void update_atc_sensor(float temperature, float humidity);
         void update_atc_battery(float battery_percent);
         bool is_using_atc_sensor();
+
+        void load_preferences_();
+        bool validate_mac_format_(const std::string &mac);
+
+        ESPPreferenceObject pref_display_;
+        ESPPreferenceObject pref_display_unit_;
+        ESPPreferenceObject pref_vertical_swing_;
+        ESPPreferenceObject pref_horizontal_swing_;
+        ESPPreferenceObject pref_temp_source_;
+        ESPPreferenceObject pref_plasma_;
+        ESPPreferenceObject pref_beeper_;
+        ESPPreferenceObject pref_sleep_;
+        ESPPreferenceObject pref_xfan_;
+        ESPPreferenceObject pref_save_;
+        ESPPreferenceObject pref_atc_mac_;
 
 #ifdef USE_ESP32_BLE_TRACKER
         bool parse_device(const esp32_ble_tracker::ESPBTDevice &device) override;
