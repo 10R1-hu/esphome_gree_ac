@@ -53,7 +53,7 @@ time:
   - platform: sntp
 
 external_components:
-  - source: github://gekkehenkie11/esphome_gree_ac
+  - source: github://10R1-hu/esphome_gree_ac
     components: [sinclair_ac]
     refresh: 0s
 
