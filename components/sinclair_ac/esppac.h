@@ -8,6 +8,7 @@
 #include "esphome/components/text/text.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/component.h"
+#include "esphome/core/preferences.h"
 
 #ifdef USE_ESP32_BLE_TRACKER
 #include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
@@ -173,6 +174,19 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         float last_atc_humidity_ = 0;           /* Last received ATC humidity */
         float last_atc_battery_ = 0;            /* Last received ATC battery percentage */
 
+        /* Preference objects for persistent storage */
+        ESPPreferenceObject pref_temp_source_;
+        ESPPreferenceObject pref_atc_mac_;
+        ESPPreferenceObject pref_display_;
+        ESPPreferenceObject pref_display_unit_;
+        ESPPreferenceObject pref_vertical_swing_;
+        ESPPreferenceObject pref_horizontal_swing_;
+        ESPPreferenceObject pref_plasma_;
+        ESPPreferenceObject pref_beeper_;
+        ESPPreferenceObject pref_sleep_;
+        ESPPreferenceObject pref_xfan_;
+        ESPPreferenceObject pref_save_;
+
         SerialProcess_t serialProcess_;
 
         float Temrec0 [16];
@@ -209,6 +223,20 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void update_atc_sensor(float temperature, float humidity);
         void update_atc_battery(float battery_percent);
         bool is_using_atc_sensor();
+
+        /* Preference management methods */
+        void load_preferences();
+        void save_temp_source_preference();
+        void save_atc_mac_preference();
+        void save_display_preference();
+        void save_display_unit_preference();
+        void save_vertical_swing_preference();
+        void save_horizontal_swing_preference();
+        void save_plasma_preference();
+        void save_beeper_preference();
+        void save_sleep_preference();
+        void save_xfan_preference();
+        void save_save_preference();
 
 #ifdef USE_ESP32_BLE_TRACKER
         bool parse_device(const esp32_ble_tracker::ESPBTDevice &device) override;

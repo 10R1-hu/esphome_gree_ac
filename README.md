@@ -29,8 +29,21 @@ No known problems! if you run into an issue though, please let me know.
 - **Universal External Sensor Support**: Use external ATC BLE temperature/humidity sensors
 - **Robust Temperature Source Selection**: Choose between AC's own sensor or external ATC sensor
 - **Automatic Fallback Logic**: Automatically falls back to AC sensor if external sensor fails or times out
+- **Persistent Settings**: All user-selected values (temperature source, ATC MAC, display settings, swing modes, and switches) are automatically saved and restored after device restart
 
 See [FAN_LEVELS.md](FAN_LEVELS.md) for detailed information about fan speed levels.
+
+## Persistent Settings
+
+The component automatically saves and restores all user-configured settings across device restarts, including:
+
+- **Temperature Source Selection**: Your choice between AC own sensor or external ATC sensor
+- **ATC MAC Address**: The configured BLE sensor MAC address
+- **Display Settings**: Display mode (OFF/Auto/Set/Actual/Outside) and temperature unit (°C/°F)
+- **Swing Modes**: Both vertical and horizontal swing positions
+- **Switch States**: Plasma, Beeper, Sleep, X-fan, and Save/8°C Heat modes
+
+All settings are stored in ESP flash memory using ESPHome's preferences API and are automatically restored on boot. No additional configuration is required - persistence is enabled by default for all supported entities.
 
 ## External Temperature Sensor Support
 
@@ -66,10 +79,10 @@ climate:
     
     # ATC MAC address input (format: AA:BB:CC:DD:EE:FF)
     # Can be changed at runtime from Home Assistant
+    # Automatically persisted across reboots
     atc_mac_address_text:
       name: "ATC MAC Address"
       mode: text
-      # Optional: restore_value: true to persist across reboots
     
     # AC's indoor temperature sensor
     ac_indoor_temp_sensor:

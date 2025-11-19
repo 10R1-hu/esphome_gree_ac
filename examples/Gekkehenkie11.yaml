@@ -62,6 +62,7 @@ external_components:
 climate:
   - platform: sinclair_ac
     name: ${devicename}
+    # Note: All settings below are automatically persisted across reboots
     horizontal_swing_select:
       name: ${devicename} Horizontal Swing Mode
     vertical_swing_select:

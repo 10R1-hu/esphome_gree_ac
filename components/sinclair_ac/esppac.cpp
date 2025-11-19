@@ -48,6 +48,22 @@ void SinclairAC::setup()
     // Initialize temperature source to AC own sensor by default
     this->temp_source_state_ = temp_source_options::AC_OWN;
 
+    // Initialize preference objects
+    this->pref_temp_source_ = global_preferences->make_preference<uint8_t>(fnv1_hash("sinclair_temp_src"));
+    this->pref_atc_mac_ = global_preferences->make_preference<std::string>(fnv1_hash("sinclair_atc_mac"));
+    this->pref_display_ = global_preferences->make_preference<uint8_t>(fnv1_hash("sinclair_display"));
+    this->pref_display_unit_ = global_preferences->make_preference<uint8_t>(fnv1_hash("sinclair_disp_unit"));
+    this->pref_vertical_swing_ = global_preferences->make_preference<uint8_t>(fnv1_hash("sinclair_v_swing"));
+    this->pref_horizontal_swing_ = global_preferences->make_preference<uint8_t>(fnv1_hash("sinclair_h_swing"));
+    this->pref_plasma_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_plasma"));
+    this->pref_beeper_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_beeper"));
+    this->pref_sleep_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_sleep"));
+    this->pref_xfan_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_xfan"));
+    this->pref_save_ = global_preferences->make_preference<bool>(fnv1_hash("sinclair_save"));
+
+    // Load saved preferences
+    load_preferences();
+
     ESP_LOGI(TAG, "Sinclair AC component v%s starting...", VERSION);
 
 #ifdef USE_ESP32_BLE_TRACKER
@@ -298,6 +314,7 @@ void SinclairAC::set_vertical_swing_select(select::Select *vertical_swing_select
         if (value == this->vertical_swing_state_)
             return;
         this->on_vertical_swing_change(value);
+        this->save_vertical_swing_preference();
     });
 }
 
@@ -308,6 +325,7 @@ void SinclairAC::set_horizontal_swing_select(select::Select *horizontal_swing_se
         if (value == this->horizontal_swing_state_)
             return;
         this->on_horizontal_swing_change(value);
+        this->save_horizontal_swing_preference();
     });
 }
 
@@ -318,6 +336,7 @@ void SinclairAC::set_display_select(select::Select *display_select)
         if (value == this->display_state_)
             return;
         this->on_display_change(value);
+        this->save_display_preference();
     });
 }
 
@@ -328,6 +347,7 @@ void SinclairAC::set_display_unit_select(select::Select *display_unit_select)
         if (value == this->display_unit_state_)
             return;
         this->on_display_unit_change(value);
+        this->save_display_unit_preference();
     });
 }
 
@@ -338,12 +358,17 @@ void SinclairAC::set_temp_source_select(select::Select *temp_source_select)
         if (value == this->temp_source_state_)
             return;
         this->on_temp_source_change(value);
+        this->save_temp_source_preference();
     });
 }
 
 void SinclairAC::set_atc_mac_address_text(text::Text *atc_mac_address_text)
 {
     this->atc_mac_address_text_ = atc_mac_address_text;
+    // Add callback to save when MAC address changes
+    this->atc_mac_address_text_->add_on_state_callback([this](const std::string &value) {
+        this->save_atc_mac_preference();
+    });
 }
 
 void SinclairAC::set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor)
@@ -373,6 +398,7 @@ void SinclairAC::set_plasma_switch(switch_::Switch *plasma_switch)
         if (state == this->plasma_state_)
             return;
         this->on_plasma_change(state);
+        this->save_plasma_preference();
     });
 }
 
@@ -383,6 +409,7 @@ void SinclairAC::set_beeper_switch(switch_::Switch *beeper_switch)
         if (state == this->beeper_state_)
             return;
         this->on_beeper_change(state);
+        this->save_beeper_preference();
     });
 }
 
@@ -393,6 +420,7 @@ void SinclairAC::set_sleep_switch(switch_::Switch *sleep_switch)
         if (state == this->sleep_state_)
             return;
         this->on_sleep_change(state);
+        this->save_sleep_preference();
     });
 }
 
@@ -403,6 +431,7 @@ void SinclairAC::set_xfan_switch(switch_::Switch *xfan_switch)
         if (state == this->xfan_state_)
             return;
         this->on_xfan_change(state);
+        this->save_xfan_preference();
     });
 }
 
@@ -413,6 +442,7 @@ void SinclairAC::set_save_switch(switch_::Switch *save_switch)
         if (state == this->save_state_)
             return;
         this->on_save_change(state);
+        this->save_save_preference();
     });
 }
 
@@ -586,6 +616,268 @@ bool SinclairAC::parse_device(const esp32_ble_tracker::ESPBTDevice &device)
     return false;
 }
 #endif
+
+/*
+ * Preference management for persistent storage
+ */
+
+void SinclairAC::load_preferences()
+{
+    ESP_LOGD(TAG, "Loading preferences from flash...");
+
+    // Load temperature source
+    uint8_t temp_source_val = 0;
+    if (this->pref_temp_source_.load(&temp_source_val)) {
+        if (temp_source_val == 0) {
+            this->temp_source_state_ = temp_source_options::AC_OWN;
+        } else {
+            this->temp_source_state_ = temp_source_options::EXTERNAL_ATC;
+        }
+        ESP_LOGD(TAG, "Restored temp source: %s", this->temp_source_state_.c_str());
+        if (this->temp_source_select_ != nullptr) {
+            this->temp_source_select_->publish_state(this->temp_source_state_);
+        }
+    }
+
+    // Load ATC MAC address
+    std::string atc_mac_val;
+    if (this->pref_atc_mac_.load(&atc_mac_val)) {
+        ESP_LOGD(TAG, "Restored ATC MAC: %s", atc_mac_val.c_str());
+        if (this->atc_mac_address_text_ != nullptr) {
+            this->atc_mac_address_text_->state = atc_mac_val;
+            this->atc_mac_address_text_->publish_state(atc_mac_val);
+        }
+    }
+
+    // Load display mode
+    uint8_t display_val = 0;
+    if (this->pref_display_.load(&display_val)) {
+        const char* display_options[] = {
+            display_options::OFF.c_str(),
+            display_options::AUTO.c_str(),
+            display_options::SET.c_str(),
+            display_options::ACT.c_str(),
+            display_options::OUT.c_str()
+        };
+        if (display_val < 5) {
+            this->display_state_ = display_options[display_val];
+            ESP_LOGD(TAG, "Restored display: %s", this->display_state_.c_str());
+            if (this->display_select_ != nullptr) {
+                this->display_select_->publish_state(this->display_state_);
+            }
+        }
+    }
+
+    // Load display unit
+    uint8_t display_unit_val = 0;
+    if (this->pref_display_unit_.load(&display_unit_val)) {
+        if (display_unit_val == 0) {
+            this->display_unit_state_ = display_unit_options::DEGC;
+        } else {
+            this->display_unit_state_ = display_unit_options::DEGF;
+        }
+        ESP_LOGD(TAG, "Restored display unit: %s", this->display_unit_state_.c_str());
+        if (this->display_unit_select_ != nullptr) {
+            this->display_unit_select_->publish_state(this->display_unit_state_);
+        }
+    }
+
+    // Load vertical swing
+    uint8_t vswing_val = 0;
+    if (this->pref_vertical_swing_.load(&vswing_val)) {
+        const char* vswing_options[] = {
+            vertical_swing_options::OFF.c_str(),
+            vertical_swing_options::FULL.c_str(),
+            vertical_swing_options::DOWN.c_str(),
+            vertical_swing_options::MIDD.c_str(),
+            vertical_swing_options::MID.c_str(),
+            vertical_swing_options::MIDU.c_str(),
+            vertical_swing_options::UP.c_str(),
+            vertical_swing_options::CDOWN.c_str(),
+            vertical_swing_options::CMIDD.c_str(),
+            vertical_swing_options::CMID.c_str(),
+            vertical_swing_options::CMIDU.c_str(),
+            vertical_swing_options::CUP.c_str()
+        };
+        if (vswing_val < 12) {
+            this->vertical_swing_state_ = vswing_options[vswing_val];
+            ESP_LOGD(TAG, "Restored vertical swing: %s", this->vertical_swing_state_.c_str());
+            if (this->vertical_swing_select_ != nullptr) {
+                this->vertical_swing_select_->publish_state(this->vertical_swing_state_);
+            }
+        }
+    }
+
+    // Load horizontal swing
+    uint8_t hswing_val = 0;
+    if (this->pref_horizontal_swing_.load(&hswing_val)) {
+        const char* hswing_options[] = {
+            horizontal_swing_options::OFF.c_str(),
+            horizontal_swing_options::FULL.c_str(),
+            horizontal_swing_options::CLEFT.c_str(),
+            horizontal_swing_options::CMIDL.c_str(),
+            horizontal_swing_options::CMID.c_str(),
+            horizontal_swing_options::CMIDR.c_str(),
+            horizontal_swing_options::CRIGHT.c_str()
+        };
+        if (hswing_val < 7) {
+            this->horizontal_swing_state_ = hswing_options[hswing_val];
+            ESP_LOGD(TAG, "Restored horizontal swing: %s", this->horizontal_swing_state_.c_str());
+            if (this->horizontal_swing_select_ != nullptr) {
+                this->horizontal_swing_select_->publish_state(this->horizontal_swing_state_);
+            }
+        }
+    }
+
+    // Load switch states
+    bool plasma_val = false;
+    if (this->pref_plasma_.load(&plasma_val)) {
+        this->plasma_state_ = plasma_val;
+        ESP_LOGD(TAG, "Restored plasma: %s", plasma_val ? "ON" : "OFF");
+        if (this->plasma_switch_ != nullptr) {
+            this->plasma_switch_->publish_state(plasma_val);
+        }
+    }
+
+    bool beeper_val = false;
+    if (this->pref_beeper_.load(&beeper_val)) {
+        this->beeper_state_ = beeper_val;
+        ESP_LOGD(TAG, "Restored beeper: %s", beeper_val ? "ON" : "OFF");
+        if (this->beeper_switch_ != nullptr) {
+            this->beeper_switch_->publish_state(beeper_val);
+        }
+    }
+
+    bool sleep_val = false;
+    if (this->pref_sleep_.load(&sleep_val)) {
+        this->sleep_state_ = sleep_val;
+        ESP_LOGD(TAG, "Restored sleep: %s", sleep_val ? "ON" : "OFF");
+        if (this->sleep_switch_ != nullptr) {
+            this->sleep_switch_->publish_state(sleep_val);
+        }
+    }
+
+    bool xfan_val = false;
+    if (this->pref_xfan_.load(&xfan_val)) {
+        this->xfan_state_ = xfan_val;
+        ESP_LOGD(TAG, "Restored xfan: %s", xfan_val ? "ON" : "OFF");
+        if (this->xfan_switch_ != nullptr) {
+            this->xfan_switch_->publish_state(xfan_val);
+        }
+    }
+
+    bool save_val = false;
+    if (this->pref_save_.load(&save_val)) {
+        this->save_state_ = save_val;
+        ESP_LOGD(TAG, "Restored save: %s", save_val ? "ON" : "OFF");
+        if (this->save_switch_ != nullptr) {
+            this->save_switch_->publish_state(save_val);
+        }
+    }
+
+    ESP_LOGI(TAG, "Preferences loaded successfully");
+}
+
+void SinclairAC::save_temp_source_preference()
+{
+    uint8_t val = (this->temp_source_state_ == temp_source_options::EXTERNAL_ATC) ? 1 : 0;
+    this->pref_temp_source_.save(&val);
+    ESP_LOGD(TAG, "Saved temp source preference: %d", val);
+}
+
+void SinclairAC::save_atc_mac_preference()
+{
+    if (this->atc_mac_address_text_ != nullptr) {
+        std::string mac = this->atc_mac_address_text_->state;
+        this->pref_atc_mac_.save(&mac);
+        ESP_LOGD(TAG, "Saved ATC MAC preference: %s", mac.c_str());
+    }
+}
+
+void SinclairAC::save_display_preference()
+{
+    uint8_t val = 0;
+    if (this->display_state_ == display_options::OFF) val = 0;
+    else if (this->display_state_ == display_options::AUTO) val = 1;
+    else if (this->display_state_ == display_options::SET) val = 2;
+    else if (this->display_state_ == display_options::ACT) val = 3;
+    else if (this->display_state_ == display_options::OUT) val = 4;
+    
+    this->pref_display_.save(&val);
+    ESP_LOGD(TAG, "Saved display preference: %d", val);
+}
+
+void SinclairAC::save_display_unit_preference()
+{
+    uint8_t val = (this->display_unit_state_ == display_unit_options::DEGF) ? 1 : 0;
+    this->pref_display_unit_.save(&val);
+    ESP_LOGD(TAG, "Saved display unit preference: %d", val);
+}
+
+void SinclairAC::save_vertical_swing_preference()
+{
+    uint8_t val = 0;
+    if (this->vertical_swing_state_ == vertical_swing_options::OFF) val = 0;
+    else if (this->vertical_swing_state_ == vertical_swing_options::FULL) val = 1;
+    else if (this->vertical_swing_state_ == vertical_swing_options::DOWN) val = 2;
+    else if (this->vertical_swing_state_ == vertical_swing_options::MIDD) val = 3;
+    else if (this->vertical_swing_state_ == vertical_swing_options::MID) val = 4;
+    else if (this->vertical_swing_state_ == vertical_swing_options::MIDU) val = 5;
+    else if (this->vertical_swing_state_ == vertical_swing_options::UP) val = 6;
+    else if (this->vertical_swing_state_ == vertical_swing_options::CDOWN) val = 7;
+    else if (this->vertical_swing_state_ == vertical_swing_options::CMIDD) val = 8;
+    else if (this->vertical_swing_state_ == vertical_swing_options::CMID) val = 9;
+    else if (this->vertical_swing_state_ == vertical_swing_options::CMIDU) val = 10;
+    else if (this->vertical_swing_state_ == vertical_swing_options::CUP) val = 11;
+    
+    this->pref_vertical_swing_.save(&val);
+    ESP_LOGD(TAG, "Saved vertical swing preference: %d", val);
+}
+
+void SinclairAC::save_horizontal_swing_preference()
+{
+    uint8_t val = 0;
+    if (this->horizontal_swing_state_ == horizontal_swing_options::OFF) val = 0;
+    else if (this->horizontal_swing_state_ == horizontal_swing_options::FULL) val = 1;
+    else if (this->horizontal_swing_state_ == horizontal_swing_options::CLEFT) val = 2;
+    else if (this->horizontal_swing_state_ == horizontal_swing_options::CMIDL) val = 3;
+    else if (this->horizontal_swing_state_ == horizontal_swing_options::CMID) val = 4;
+    else if (this->horizontal_swing_state_ == horizontal_swing_options::CMIDR) val = 5;
+    else if (this->horizontal_swing_state_ == horizontal_swing_options::CRIGHT) val = 6;
+    
+    this->pref_horizontal_swing_.save(&val);
+    ESP_LOGD(TAG, "Saved horizontal swing preference: %d", val);
+}
+
+void SinclairAC::save_plasma_preference()
+{
+    this->pref_plasma_.save(&this->plasma_state_);
+    ESP_LOGD(TAG, "Saved plasma preference: %s", this->plasma_state_ ? "ON" : "OFF");
+}
+
+void SinclairAC::save_beeper_preference()
+{
+    this->pref_beeper_.save(&this->beeper_state_);
+    ESP_LOGD(TAG, "Saved beeper preference: %s", this->beeper_state_ ? "ON" : "OFF");
+}
+
+void SinclairAC::save_sleep_preference()
+{
+    this->pref_sleep_.save(&this->sleep_state_);
+    ESP_LOGD(TAG, "Saved sleep preference: %s", this->sleep_state_ ? "ON" : "OFF");
+}
+
+void SinclairAC::save_xfan_preference()
+{
+    this->pref_xfan_.save(&this->xfan_state_);
+    ESP_LOGD(TAG, "Saved xfan preference: %s", this->xfan_state_ ? "ON" : "OFF");
+}
+
+void SinclairAC::save_save_preference()
+{
+    this->pref_save_.save(&this->save_state_);
+    ESP_LOGD(TAG, "Saved save preference: %s", this->save_state_ ? "ON" : "OFF");
+}
 
 /*
  * Debugging
