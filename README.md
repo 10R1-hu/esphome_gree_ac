@@ -32,7 +32,7 @@ No known problems! if you run into an issue though, please let me know.
 - **Universal External Sensor Support**: Use external ATC BLE temperature/humidity sensors
 - **Robust Temperature Source Selection**: Choose between AC's own sensor or external ATC sensor
 - **Automatic Fallback Logic**: Automatically falls back to AC sensor if external sensor fails or times out
-- **Persistent User Settings**: All user preferences (display mode, swing positions, temperature source, switches, ATC MAC) are automatically saved and restored across reboots
+- **Persistent User Settings**: All user preferences (display mode, swing positions, temperature source, switches, ATC MAC) are automatically saved and restored across reboots without requiring YAML `restore_value` or `restore_mode` configuration
 
 See [FAN_LEVELS.md](FAN_LEVELS.md) for detailed information about fan speed levels.
 
@@ -123,6 +123,28 @@ climate:
 - All sensor names appear clearly in Home Assistant for easy identification
 - This feature works universally across all rooms and sensors in your setup
 - **ESP8266 compatibility**: If using ESP8266, the BLE listener is automatically disabled, and the component continues to work without ATC support
+
+## Persistent Settings (v0.0.3+)
+
+From version 0.0.3 onwards, all user preferences are automatically persisted across reboots:
+
+### Persisted Settings:
+- Display mode (OFF, Auto, Set, Actual, Outside temperature)
+- Display unit (°C / °F)
+- Vertical swing position (12 positions)
+- Horizontal swing position (7 positions)
+- Temperature source selection (AC Own Sensor / External ATC Sensor)
+- All switch states (Plasma, Beeper, Sleep, X-fan, Save)
+- ATC MAC address
+
+### Features:
+- **No YAML configuration needed**: You do NOT need to add `restore_value: true` or `restore_mode` to your entity configurations
+- **Automatic saving**: Settings are saved immediately when changed via Home Assistant
+- **Smart validation**: Invalid settings are detected and corrected on load with fallback to safe defaults
+- **MAC validation**: ATC MAC addresses are validated before saving; if temperature source is set to "External ATC" but MAC is invalid/empty, the system automatically falls back to "AC Own Sensor"
+- **Cross-reboot persistence**: All settings survive ESP reboots, power cycles, and firmware updates
+
+This means your AC will maintain its configuration exactly as you left it, without any additional YAML configuration!
 
 # HOW TO 
 You can flash this to an ESP module. I used an ESP01-M module, like this one:

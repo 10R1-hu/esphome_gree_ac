@@ -214,6 +214,31 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void load_preferences_();
         bool validate_mac_format_(const std::string &mac);
 
+        // Helper functions for mapping between string options and uint8_t indices
+        uint8_t display_index_from_string_(const std::string &s);
+        std::string display_string_from_index_(uint8_t i);
+        uint8_t display_unit_index_from_string_(const std::string &s);
+        std::string display_unit_string_from_index_(uint8_t i);
+        uint8_t vertical_swing_index_from_string_(const std::string &s);
+        std::string vertical_swing_string_from_index_(uint8_t i);
+        uint8_t horizontal_swing_index_from_string_(const std::string &s);
+        std::string horizontal_swing_string_from_index_(uint8_t i);
+        uint8_t temp_source_index_from_string_(const std::string &s);
+        std::string temp_source_string_from_index_(uint8_t i);
+
+        // Preference keys (stable numeric keys)
+        static constexpr uint32_t PREF_KEY_DISPLAY = 0x53414301;
+        static constexpr uint32_t PREF_KEY_DISPLAY_UNIT = 0x53414302;
+        static constexpr uint32_t PREF_KEY_VERTICAL_SWING = 0x53414303;
+        static constexpr uint32_t PREF_KEY_HORIZONTAL_SWING = 0x53414304;
+        static constexpr uint32_t PREF_KEY_TEMP_SOURCE = 0x53414305;
+        static constexpr uint32_t PREF_KEY_PLASMA = 0x53414306;
+        static constexpr uint32_t PREF_KEY_BEEPER = 0x53414307;
+        static constexpr uint32_t PREF_KEY_SLEEP = 0x53414308;
+        static constexpr uint32_t PREF_KEY_XFAN = 0x53414309;
+        static constexpr uint32_t PREF_KEY_SAVE = 0x5341430A;
+        static constexpr uint32_t PREF_KEY_ATC_MAC = 0x5341430B;
+
         ESPPreferenceObject pref_display_;
         ESPPreferenceObject pref_display_unit_;
         ESPPreferenceObject pref_vertical_swing_;
