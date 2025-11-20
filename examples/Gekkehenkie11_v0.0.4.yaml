@@ -1,0 +1,113 @@
+substitutions:
+  node_name: gree # Use a unique name.
+  node_id: Gree_ac    # Use a unique id.
+  friendly_node_name: "Gree AC"
+  deviceid: gree
+  devicename: Kitchen
+
+esphome:
+  name: gree
+  friendly_name: "Gree AC"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "[insert yours]"
+
+ota:
+  - platform: esphome
+    password: "[insert yours]"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Gree Fallback Hotspot"
+    password: "[insert yours]"
+
+captive_portal:
+
+# Enable logging
+logger:
+  baud_rate: 0 # disable LOG output on UART as UART is used for Sinclair AC unit
+  level: DEBUG
+
+uart:
+  tx_pin: 1
+  rx_pin: 3
+  baud_rate: 4800
+  parity: EVEN
+
+time:
+  - platform: sntp
+
+external_components:
+  - source: github://10R1-hu/esphome_gree_ac
+    components: [sinclair_ac]
+    refresh: 0s
+
+# ==========================================
+# Optional External Sensor Configuration
+# Uncomment and configure if you want to use an external temperature sensor
+# ==========================================
+
+# Example: pvvx_mithermometer BLE sensor (ESP32 only)
+# Uncomment the following if you want to use an external BLE temperature sensor:
+
+# esp32_ble_tracker:
+#   scan_parameters:
+#     active: false
+
+# sensor:
+#   - platform: pvvx_mithermometer
+#     mac_address: "A4:C1:38:0D:10:15"  # Replace with your sensor's MAC
+#     temperature:
+#       name: "${devicename} External Temperature"
+#       id: external_temp_sensor
+#     humidity:
+#       name: "${devicename} External Humidity"
+#     battery_level:
+#       name: "${devicename} External Battery"
+
+# ==========================================
+
+climate:
+  - platform: sinclair_ac
+    name: ${devicename}
+    
+    # Reference external sensor (uncomment if you configured a sensor above)
+    # current_temperature_sensor: external_temp_sensor
+    
+    horizontal_swing_select:
+      name: ${devicename} Horizontal Swing Mode
+    vertical_swing_select:
+      name: ${devicename} Vertical Swing Mode
+    display_select:
+      name: ${devicename} Display Mode
+    display_unit_select:
+      name: ${devicename} Display Unit
+    temp_source_select:
+      name: ${devicename} Temperature Source
+    plasma_switch:
+      name: ${devicename} Plasma
+    beeper_switch:
+      name: ${devicename} Beeper      
+    sleep_switch:
+      name: ${devicename} Sleep
+    xfan_switch:
+      name: ${devicename} X-fan
+    save_switch:
+      name: ${devicename} Save/8 Heat
+    ac_indoor_temp_sensor:
+      name: ${devicename} AC Indoor Temperature
+      unit_of_measurement: "°C"
+      accuracy_decimals: 1
+      device_class: temperature
+      state_class: measurement
