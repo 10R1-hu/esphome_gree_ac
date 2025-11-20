@@ -1,0 +1,157 @@
+---
+# examples/test_gree_v0.0.4.yaml
+# Purpose: Minimal test configuration for Sinclair/Gree AC component v0.0.4
+# - Demonstrates external sensor integration (any ESPHome sensor)
+# - Temperature source selection & persistence (AC Own vs External)
+# - Works even if UART not yet connected
+# - Safe defaults; you can OTA flash immediately
+#
+# Usage Instructions:
+# 1. Replace ssid/password & API/OTA keys with your own.
+# 2. Configure your external sensor (pvvx_mithermometer example below - uncomment and configure)
+# 3. Set the AC Temperature Source to "AC Own Sensor" until UART is wired.
+# 4. Once external sensor data is available, switch to "External Sensor"
+# 5. Reboot -> temperature source preference persists
+# 6. After wiring UART to indoor unit, AC indoor temperature will appear.
+#
+# Notes:
+# - Logger level DEBUG for diagnostics; raise to INFO for quieter logs.
+# - Persistence is internal; DO NOT add restore_value/restore_mode unless you want YAML-level override.
+# - External sensor is optional; AC works normally with its own sensor if none configured.
+# - When "AC Own Sensor" is selected, external sensor updates are ignored.
+# - When "External Sensor" is selected, climate tracks the external sensor value.
+#
+# Hardware:
+# - ESP32 or ESP8266 supported (ESP32 needed for BLE sensors like pvvx_mithermometer).
+#
+# Test Checklist After Flash:
+# [ ] With external sensor configured, observe sensor data in HA
+# [ ] Switch to External Sensor, observe climate uses external temp
+# [ ] Switch to AC Own Sensor, observe climate uses AC temp (after UART connected)
+# [ ] Reboot, verify temperature source selection persists
+# [ ] After connecting UART, AC Indoor Temp appears
+#
+# SECURITY: Replace secrets before deploying.
+
+esphome:
+  name: test_gree
+  friendly_name: Test Gree AC
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+wifi:
+  ssid: "Example_WiFi"  # REPLACE with your WiFi SSID
+  password: "examplepass"  # REPLACE with your WiFi password
+  ap:
+    ssid: "TestGree Fallback"
+    password: "fallbackpass"  # REPLACE with your fallback password
+
+api:
+  encryption:
+    key: "bRxu8o/bFusdN6OJaA0Y+V0t02wajIiQx9e2wa35u6g="  # REPLACE with your own base64 key (must be 32 bytes)
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    password: "examplepassword123"  # REPLACE with your own password
+
+logger:
+  level: DEBUG
+  baud_rate: 0
+
+# UART to AC indoor unit (wire later if not yet connected)
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 4800
+  parity: EVEN
+
+external_components:
+  - source: github://10R1-hu/esphome_gree_ac
+    components: [sinclair_ac]
+    refresh: 0s
+
+# ==========================================
+# Example External Sensor Configuration
+# Uncomment ONE of the following examples:
+# ==========================================
+
+# Example 1: pvvx_mithermometer BLE sensor (ESP32 only, requires esp32_ble_tracker)
+# esp32_ble_tracker:
+#   scan_parameters:
+#     active: false
+# 
+# sensor:
+#   - platform: pvvx_mithermometer
+#     mac_address: "A4:C1:38:0D:10:15"  # Replace with your sensor's MAC
+#     temperature:
+#       name: "External Room Temperature"
+#       id: external_temp
+#     humidity:
+#       name: "External Room Humidity"
+#     battery_level:
+#       name: "External Sensor Battery"
+
+# Example 2: DHT22 sensor (ESP32 or ESP8266)
+# sensor:
+#   - platform: dht
+#     pin: GPIO4
+#     temperature:
+#       name: "Room Temperature"
+#       id: external_temp
+#     humidity:
+#       name: "Room Humidity"
+#     model: DHT22
+#     update_interval: 60s
+
+# Example 3: Home Assistant sensor (ESP32 or ESP8266)
+# sensor:
+#   - platform: homeassistant
+#     name: "Room Temperature from HA"
+#     id: external_temp
+#     entity_id: sensor.living_room_temperature
+
+# ==========================================
+
+climate:
+  - platform: sinclair_ac
+    id: sinclair_test_ac
+    name: "Test Gree Sinclair AC"
+
+    # Reference external sensor (uncomment after configuring sensor above)
+    # current_temperature_sensor: external_temp
+
+    # Temperature source selection (persisted internally)
+    temp_source_select:
+      name: "AC Temperature Source"
+
+    # AC indoor temp sensor (optional, for display in HA)
+    ac_indoor_temp_sensor:
+      name: "AC Indoor Temperature"
+      accuracy_decimals: 1
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+
+    # Advanced options (all persist internally)
+    vertical_swing_select:
+      name: "Vertical Swing"
+    horizontal_swing_select:
+      name: "Horizontal Swing"
+    display_select:
+      name: "Display Mode"
+    display_unit_select:
+      name: "Display Unit"
+    plasma_switch:
+      name: "Plasma"
+    beeper_switch:
+      name: "Beeper"
+    sleep_switch:
+      name: "Sleep"
+    xfan_switch:
+      name: "X-Fan"
+    save_switch:
+      name: "Save/8°C Heat"
