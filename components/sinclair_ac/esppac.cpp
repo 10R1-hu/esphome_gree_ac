@@ -171,7 +171,7 @@ void SinclairAC::setup()
     this->pref_sleep_ = global_preferences->make_preference<bool>(PREF_KEY_SLEEP);
     this->pref_xfan_ = global_preferences->make_preference<bool>(PREF_KEY_XFAN);
     this->pref_save_ = global_preferences->make_preference<bool>(PREF_KEY_SAVE);
-    this->pref_atc_mac_ = global_preferences->make_preference<char[18]>(PREF_KEY_ATC_MAC);
+    this->pref_atc_mac_ = global_preferences->make_preference<MacAddressStorage>(PREF_KEY_ATC_MAC);
 
     // Load persisted preferences
     load_preferences_();
@@ -514,10 +514,10 @@ void SinclairAC::set_atc_mac_address_text(text::Text *atc_mac_address_text)
     // Add callback to save MAC when it changes
     this->atc_mac_address_text_->add_on_state_callback([this](const std::string &value) {
         if (validate_mac_format_(value)) {
-            char mac_array[18] = {0};
-            strncpy(mac_array, value.c_str(), 17);
-            mac_array[17] = '\0';
-            this->pref_atc_mac_.save(&mac_array);
+            MacAddressStorage mac_storage = {{0}};
+            strncpy(mac_storage.data, value.c_str(), 17);
+            mac_storage.data[17] = '\0';
+            this->pref_atc_mac_.save(&mac_storage);
             ESP_LOGD(TAG, "ATC MAC address saved: %s", value.c_str());
         } else if (!value.empty()) {
             ESP_LOGW(TAG, "Invalid MAC address format: %s (expected AA:BB:CC:DD:EE:FF)", value.c_str());
@@ -696,7 +696,7 @@ void SinclairAC::load_preferences_()
     uint8_t loaded_vswing_idx = 0;
     uint8_t loaded_hswing_idx = 0;
     uint8_t loaded_temp_source_idx = 0;
-    char loaded_atc_mac[18] = {0};
+    MacAddressStorage loaded_atc_mac = {{0}};
     bool loaded_plasma = false;
     bool loaded_beeper = false;
     bool loaded_sleep = false;
@@ -761,8 +761,8 @@ void SinclairAC::load_preferences_()
     
     // Load ATC MAC address
     if (this->pref_atc_mac_.load(&loaded_atc_mac)) {
-        std::string mac_str(loaded_atc_mac);
-        if (!mac_str.empty() && loaded_atc_mac[0] != '\0') {
+        std::string mac_str(loaded_atc_mac.data);
+        if (!mac_str.empty() && loaded_atc_mac.data[0] != '\0') {
             if (validate_mac_format_(mac_str)) {
                 if (this->atc_mac_address_text_ != nullptr) {
                     this->atc_mac_address_text_->publish_state(mac_str);

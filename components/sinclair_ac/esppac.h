@@ -18,6 +18,11 @@ namespace esphome {
 
 namespace sinclair_ac {
 
+// POD struct for MAC address storage in preferences
+struct MacAddressStorage {
+    char data[18];  // 17 chars for MAC + 1 for null terminator
+};
+
 static const char *const VERSION = "0.0.3";
 
 static const uint8_t READ_TIMEOUT = 20;  // The maximum time to wait before considering a packet complete
