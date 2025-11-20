@@ -725,7 +725,7 @@ bool SinclairACCNT::processUnitReport()
     float newTargetTemperature = 0;
     
     if (Temset < 0 || Temset > 15)
-          ESP_LOGW(TAG, "Invalid Temset reived !");
+          ESP_LOGW(TAG, "Invalid Temset received !");
     else
     {
         if (Temrec)
@@ -1070,7 +1070,6 @@ void SinclairACCNT::on_temp_source_change(const std::string &temp_source)
 {
     ESP_LOGD(TAG, "Setting temperature source to: %s", temp_source.c_str());
     
-    std::string previous_source = this->temp_source_state_;
     this->temp_source_state_ = temp_source;
     
     // If switching to AC Own mode and we have external sensor configured,
