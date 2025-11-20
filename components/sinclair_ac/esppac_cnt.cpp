@@ -753,15 +753,19 @@ bool SinclairACCNT::processUnitReport()
     // Update current_temperature based on selected source
     if (this->current_temperature_sensor_ == nullptr)
     {
-        // If not using legacy external sensor, check if we should use ATC sensor or AC sensor
-        if (this->is_using_atc_sensor() && this->atc_sensor_valid_) {
-            // Use ATC sensor value (already set via update_atc_sensor)
-            // Current temperature was already updated via update_atc_sensor callback
-        } else {
-            // Use AC's own sensor
+        // If not using external sensor, always use AC's own sensor
+        if (this->current_temperature != acIndoorTemperature) hasChanged = true;
+        this->update_current_temperature(acIndoorTemperature);
+    }
+    else
+    {
+        // External sensor is configured
+        if (this->temp_source_state_ == temp_source_options::AC_OWN) {
+            // Use AC's own sensor when AC Own mode is selected
             if (this->current_temperature != acIndoorTemperature) hasChanged = true;
             this->update_current_temperature(acIndoorTemperature);
         }
+        // else: External sensor mode - temperature is updated via sensor callback
     }
 
     std::string verticalSwing = determine_vertical_swing();
@@ -1066,19 +1070,35 @@ void SinclairACCNT::on_temp_source_change(const std::string &temp_source)
 {
     ESP_LOGD(TAG, "Setting temperature source to: %s", temp_source.c_str());
     
+    std::string previous_source = this->temp_source_state_;
     this->temp_source_state_ = temp_source;
     
-    // If switching to ATC sensor, validate MAC address
-    if (temp_source == temp_source_options::EXTERNAL_ATC) {
-        if (this->atc_mac_address_text_ == nullptr || this->atc_mac_address_text_->state.empty()) {
-            ESP_LOGW(TAG, "Cannot switch to ATC sensor: MAC address not configured");
+    // If switching to AC Own mode and we have external sensor configured,
+    // immediately update to AC indoor temperature
+    if (temp_source == temp_source_options::AC_OWN && this->current_temperature_sensor_ != nullptr) {
+        // Get last known AC indoor temperature from the sensor if available
+        if (this->ac_indoor_temp_sensor_ != nullptr && !std::isnan(this->ac_indoor_temp_sensor_->state)) {
+            this->current_temperature = this->ac_indoor_temp_sensor_->state;
+            this->publish_state();
+            ESP_LOGI(TAG, "Switched to AC own sensor (current: %.1f°C)", this->current_temperature);
+        } else {
+            ESP_LOGI(TAG, "Switched to AC own sensor");
+        }
+    } else if (temp_source == temp_source_options::EXTERNAL_SENSOR) {
+        if (this->current_temperature_sensor_ == nullptr) {
+            ESP_LOGW(TAG, "Cannot switch to External sensor: no external sensor configured");
             this->temp_source_state_ = temp_source_options::AC_OWN;
             this->update_temp_source(this->temp_source_state_);
             return;
         }
-        ESP_LOGI(TAG, "Switched to ATC sensor (MAC: %s)", this->atc_mac_address_text_->state.c_str());
-    } else {
-        ESP_LOGI(TAG, "Switched to AC own sensor");
+        // If switching to external sensor, use its current value if available
+        if (!std::isnan(this->current_temperature_sensor_->state)) {
+            this->current_temperature = this->current_temperature_sensor_->state;
+            this->publish_state();
+            ESP_LOGI(TAG, "Switched to external sensor (current: %.1f°C)", this->current_temperature);
+        } else {
+            ESP_LOGI(TAG, "Switched to external sensor");
+        }
     }
 }
 
