@@ -1,5 +1,6 @@
 // based on: https://github.com/DomiStyle/esphome-panasonic-ac
 #include "esppac_cnt.h"
+#include <cstring>
 
 namespace esphome {
 namespace sinclair_ac {
@@ -11,6 +12,19 @@ void SinclairACCNT::setup()
 {
     SinclairAC::setup();
     ESP_LOGD(TAG, "Using serial protocol for Sinclair AC");
+    
+    // Initialize last packet preference
+    this->pref_last_packet_ = global_preferences->make_preference<LastPacketPayload>(PREF_KEY_LAST_PACKET);
+    
+    // Try to load last packet from NVS
+    if (this->pref_last_packet_.load(&this->last_packet_payload_)) {
+        this->has_last_packet_ = true;
+        ESP_LOGD(TAG, "Loaded last update payload from NVS (45 bytes)");
+    } else {
+        this->has_last_packet_ = false;
+        ESP_LOGD(TAG, "No saved update payload found in NVS");
+    }
+    
     Temrec0[0] = 15.5555555555556;
     Temrec0[1] = 16.6666666666667;
     Temrec0[2] = 17.7777777778;
@@ -74,6 +88,13 @@ void SinclairACCNT::loop()
             this->state_ = ACState::Ready;  
             Component::status_clear_error();
             this->last_packet_sent_ = millis();
+            
+            // Auto-resend last packet on AC becoming Ready (only once per boot)
+            if (this->has_last_packet_ && !this->packet_resent_on_ready_) {
+                ESP_LOGI(TAG, "AC became Ready - will resend last stored packet");
+                this->packet_resent_on_ready_ = true;
+                this->pending_stored_packet_resend_ = true;
+            }
         }
 
         if (this->update_ == ACUpdate::NoUpdate)
@@ -83,7 +104,16 @@ void SinclairACCNT::loop()
     }
 
     /* we will send a packet to the AC as a reponse to indicate changes */
-    send_packet();
+    // Check if we need to send the stored packet first
+    if (this->pending_stored_packet_resend_)
+    {
+        this->pending_stored_packet_resend_ = false;
+        send_stored_packet_();
+    }
+    else
+    {
+        send_packet();
+    }
 
     /* if there are no packets for 5 seconds - mark module as not ready */
     if (millis() - this->last_packet_received_ >= protocol::TIME_TIMEOUT_INACTIVE_MS)
@@ -547,6 +577,19 @@ void SinclairACCNT::send_packet()
     if (this->save_state_)
     {
         packet[protocol::REPORT_SAVE_BYTE] |= protocol::REPORT_SAVE_MASK;
+    }
+
+    /* Save the 45-byte SET payload for power-outage recovery (before CMD/len/checksum/SYNC) */
+    if (this->update_ != ACUpdate::NoUpdate)
+    {
+        // Copy the 45-byte payload to RAM using memcpy for better performance
+        std::memcpy(this->last_packet_payload_.data, packet.data(), protocol::SET_PACKET_LEN);
+        
+        // Save to NVS
+        this->pref_last_packet_.save(&this->last_packet_payload_);
+        this->has_last_packet_ = true;
+        
+        ESP_LOGD(TAG, "Saved last update payload to NVS");
     }
 
     /* Do the command, length */
@@ -1144,6 +1187,70 @@ void SinclairACCNT::on_save_change(bool save)
 
     this->update_ = ACUpdate::UpdateStart;
     this->save_state_ = save;
+}
+
+/*
+ * Public method to manually trigger resending the last stored packet
+ */
+void SinclairACCNT::force_resend_last_packet()
+{
+    if (!this->has_last_packet_)
+    {
+        ESP_LOGW(TAG, "force_resend_last_packet called but no saved packet available");
+        return;
+    }
+    
+    if (this->state_ != ACState::Ready)
+    {
+        ESP_LOGW(TAG, "force_resend_last_packet called but AC is not Ready");
+        return;
+    }
+    
+    ESP_LOGI(TAG, "Manually triggering resend of last stored packet");
+    send_stored_packet_();
+}
+
+/*
+ * Helper method to send the stored packet payload
+ */
+void SinclairACCNT::send_stored_packet_()
+{
+    if (!this->has_last_packet_)
+    {
+        ESP_LOGW(TAG, "send_stored_packet_ called but no saved packet available");
+        return;
+    }
+    
+    // Create packet vector and copy stored 45-byte payload
+    std::vector<uint8_t> packet(protocol::SET_PACKET_LEN);
+    std::memcpy(packet.data(), this->last_packet_payload_.data, protocol::SET_PACKET_LEN);
+    
+    // Add CMD and length
+    packet.insert(packet.begin(), protocol::CMD_OUT_PARAMS_SET);
+    packet.insert(packet.begin(), protocol::SET_PACKET_LEN + 2); /* Add 2 bytes as we added a command and will add checksum */
+    
+    // Calculate and add checksum - sum of all bytes except sync and checksum itself (modulo 0x100 via uint8_t)
+    uint8_t checksum = 0;
+    for (uint8_t i = 0 ; i < packet.size() ; i++)
+    {
+        checksum += packet[i];
+    }
+    packet.push_back(checksum);
+    
+    // Add SYNC bytes
+    packet.insert(packet.begin(), protocol::SYNC);
+    packet.insert(packet.begin(), protocol::SYNC);
+    
+    // Send the packet
+    this->last_packet_sent_ = millis();
+    this->wait_response_ = true;
+    write_array(packet);
+    log_packet(packet, true);
+    
+    ESP_LOGI(TAG, "Resent last stored packet (45-byte payload)");
+    
+    // Clear the update flag since we just sent
+    this->update_ = ACUpdate::NoUpdate;
 }
 
 }  // namespace CNT

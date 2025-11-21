@@ -18,6 +18,11 @@ enum class ACUpdate {
     UpdateClear, /* update without 0xAF and cleared static flag */
 };
 
+// Structure for storing the 45-byte SET packet payload in NVS
+struct LastPacketPayload {
+    uint8_t data[45];  // Must match protocol::SET_PACKET_LEN (45 bytes)
+};
+
 namespace protocol {
     /* SYNC */
     static const uint8_t SYNC                = 0x7E;
@@ -169,6 +174,8 @@ class SinclairACCNT : public SinclairAC {
         void setup() override;
         void loop() override;
 
+        void force_resend_last_packet();
+
     protected:
         ACState state_ = ACState::Initializing; /* Stores if the AC is responsive or not */
         ACUpdate update_ = ACUpdate::NoUpdate;  /* Stores if we need tu send update to AC or no */
@@ -179,9 +186,16 @@ class SinclairACCNT : public SinclairAC {
         std::string display_mode_internal_;
         bool display_power_internal_;
 
+        // Power-outage safe: last applied SET payload
+        LastPacketPayload last_packet_payload_;
+        bool has_last_packet_ = false;
+        bool packet_resent_on_ready_ = false;
+        bool pending_stored_packet_resend_ = false;
+
         bool processUnitReport();
 
         void send_packet();
+        void send_stored_packet_();
 
         bool reqmodechange = false;
         unsigned char lastpacket[60];
