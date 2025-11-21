@@ -751,18 +751,21 @@ bool SinclairACCNT::processUnitReport()
     }
     
     // Update current_temperature based on selected source
-    if (this->current_temperature_sensor_ == nullptr)
+    // Use AC temperature when: 
+    //  - No external sensor configured (current_temperature_sensor_ == nullptr), OR
+    //  - AC Own Sensor mode selected, OR
+    //  - ATC Fail mode selected, OR
+    //  - External sensor has failed (atc_failed_ == true)
+    if (this->current_temperature_sensor_ == nullptr ||
+        this->temp_source_state_ == temp_source_options::AC_OWN ||
+        this->temp_source_state_ == temp_source_options::ATC_FAIL ||
+        this->atc_failed_)
     {
-        // If not using legacy external sensor, check if we should use ATC sensor or AC sensor
-        if (this->is_using_atc_sensor() && this->atc_sensor_valid_) {
-            // Use ATC sensor value (already set via update_atc_sensor)
-            // Current temperature was already updated via update_atc_sensor callback
-        } else {
-            // Use AC's own sensor
-            if (this->current_temperature != acIndoorTemperature) hasChanged = true;
-            this->update_current_temperature(acIndoorTemperature);
-        }
+        // Use AC's own sensor
+        if (this->current_temperature != acIndoorTemperature) hasChanged = true;
+        this->update_current_temperature(acIndoorTemperature);
     }
+    // Otherwise, if using External ATC Sensor and not failed, external sensor callback handles temperature
 
     std::string verticalSwing = determine_vertical_swing();
     std::string horizontalSwing = determine_horizontal_swing();
@@ -1068,17 +1071,24 @@ void SinclairACCNT::on_temp_source_change(const std::string &temp_source)
     
     this->temp_source_state_ = temp_source;
     
-    // If switching to ATC sensor, validate MAC address
-    if (temp_source == temp_source_options::EXTERNAL_ATC) {
-        if (this->atc_mac_address_text_ == nullptr || this->atc_mac_address_text_->state.empty()) {
-            ESP_LOGW(TAG, "Cannot switch to ATC sensor: MAC address not configured");
-            this->temp_source_state_ = temp_source_options::AC_OWN;
-            this->update_temp_source(this->temp_source_state_);
-            return;
-        }
-        ESP_LOGI(TAG, "Switched to ATC sensor (MAC: %s)", this->atc_mac_address_text_->state.c_str());
-    } else {
+    // Handle temperature source mode changes
+    if (temp_source == temp_source_options::AC_OWN) {
+        // Manual switch to AC Own: clear fail flag
+        this->atc_failed_ = false;
         ESP_LOGI(TAG, "Switched to AC own sensor");
+    } else if (temp_source == temp_source_options::EXTERNAL_ATC) {
+        // Manual switch to External ATC: clear fail flag
+        this->atc_failed_ = false;
+        // If recent external data exists, immediately adopt it
+        if (!std::isnan(this->last_external_temperature_)) {
+            this->current_temperature = this->last_external_temperature_;
+            this->publish_state();
+        }
+        ESP_LOGI(TAG, "Switched to External ATC sensor");
+    } else if (temp_source == temp_source_options::ATC_FAIL) {
+        // Manual selection of ATC Fail mode: set fail flag and use AC temperature
+        this->atc_failed_ = true;
+        ESP_LOGI(TAG, "Manually set to ATC Fail mode - using AC sensor until recovery");
     }
 }
 

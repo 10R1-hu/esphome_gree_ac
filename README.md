@@ -1,6 +1,6 @@
 # Open source WIFI module replacement for Gree protocol based AC's for Home Assistant.
 
-**Version: v0.0.3**
+**Version: v0.0.5**
 
 This repository adds support for ESP-based WiFi modules to interface with Gree/Sinclair AC units.
 It's forked from https://github.com/piotrva/esphome_gree_ac, big thanks to @piotrva for his work!
