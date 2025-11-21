@@ -754,8 +754,7 @@ bool SinclairACCNT::processUnitReport()
     // Use AC temperature when: 
     //  - No external sensor configured (current_temperature_sensor_ == nullptr), OR
     //  - AC Own Sensor mode selected, OR
-    //  - ATC Fail mode selected, OR
-    //  - External sensor has failed (atc_failed_ == true)
+    //  - ATC Fail mode selected
     if (this->current_temperature_sensor_ == nullptr ||
         this->temp_source_state_ == temp_source_options::AC_OWN ||
         this->temp_source_state_ == temp_source_options::ATC_FAIL ||

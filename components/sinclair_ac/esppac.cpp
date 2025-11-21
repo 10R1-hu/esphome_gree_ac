@@ -583,7 +583,7 @@ void SinclairAC::check_external_timeout()
         return;  // No external data received yet
     }
 
-    // Check if sensor has timed out (15 minutes = 900000 ms)
+    // Check if sensor has timed out (ATC_SENSOR_TIMEOUT_MS)
     uint32_t time_since_update = millis() - this->last_external_update_;
     if (time_since_update > ATC_SENSOR_TIMEOUT_MS) {
         ESP_LOGW(TAG, "External sensor timeout (no data for 15 minutes), switching to ATC Fail mode");
