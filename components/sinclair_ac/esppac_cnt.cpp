@@ -13,10 +13,10 @@ void SinclairACCNT::setup()
     ESP_LOGD(TAG, "Using serial protocol for Sinclair AC");
     
     // Initialize last packet preference
-    this->pref_last_packet_ = global_preferences->make_preference<uint8_t[protocol::SET_PACKET_LEN]>(PREF_KEY_LAST_PACKET);
+    this->pref_last_packet_ = global_preferences->make_preference<LastPacketPayload>(PREF_KEY_LAST_PACKET);
     
     // Try to load last packet from NVS
-    if (this->pref_last_packet_.load(this->last_packet_payload_)) {
+    if (this->pref_last_packet_.load(&this->last_packet_payload_)) {
         this->has_last_packet_ = true;
         ESP_LOGD(TAG, "Loaded last update payload from NVS (45 bytes)");
     } else {
@@ -584,11 +584,11 @@ void SinclairACCNT::send_packet()
         // Copy the 45-byte payload to RAM
         for (uint8_t i = 0; i < protocol::SET_PACKET_LEN; i++)
         {
-            this->last_packet_payload_[i] = packet[i];
+            this->last_packet_payload_.data[i] = packet[i];
         }
         
         // Save to NVS
-        this->pref_last_packet_.save(this->last_packet_payload_);
+        this->pref_last_packet_.save(&this->last_packet_payload_);
         this->has_last_packet_ = true;
         
         ESP_LOGD(TAG, "Saved last update payload to NVS");
@@ -1224,7 +1224,7 @@ void SinclairACCNT::send_stored_packet_()
     }
     
     // Create packet from stored 45-byte payload
-    std::vector<uint8_t> packet(this->last_packet_payload_, this->last_packet_payload_ + protocol::SET_PACKET_LEN);
+    std::vector<uint8_t> packet(this->last_packet_payload_.data, this->last_packet_payload_.data + protocol::SET_PACKET_LEN);
     
     // Add CMD and length
     packet.insert(packet.begin(), protocol::CMD_OUT_PARAMS_SET);
