@@ -5,25 +5,15 @@
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
-#include "esphome/components/text/text.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
-
-#ifdef USE_ESP32_BLE_TRACKER
-#include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
-#endif
 
 namespace esphome {
 
 namespace sinclair_ac {
 
-// POD struct for MAC address storage in preferences
-struct MacAddressStorage {
-    char data[18];  // 17 chars for MAC + 1 for null terminator
-};
-
-static const char *const VERSION = "0.0.3";
+static const char *const VERSION = "0.0.5";
 
 static const uint8_t READ_TIMEOUT = 20;  // The maximum time to wait before considering a packet complete
 
@@ -92,6 +82,7 @@ namespace display_unit_options{
 namespace temp_source_options{
     const std::string AC_OWN = "AC Own Sensor";
     const std::string EXTERNAL_ATC = "External ATC Sensor";
+    const std::string ATC_FAIL = "ATC Fail";
 }
 
 typedef enum {
@@ -111,9 +102,6 @@ typedef struct {
 } SerialProcess_t;
 
 class SinclairAC : public Component, public uart::UARTDevice, public climate::Climate
-#ifdef USE_ESP32_BLE_TRACKER
-    , public esp32_ble_tracker::ESPBTDeviceListener
-#endif
 {
     public:
         void set_vertical_swing_select(select::Select *vertical_swing_select);
@@ -130,11 +118,7 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void set_save_switch(switch_::Switch *plasma_switch);
 
         void set_current_temperature_sensor(sensor::Sensor *current_temperature_sensor);
-        void set_atc_mac_address_text(text::Text *atc_mac_address_text);
         void set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor);
-        void set_atc_room_temp_sensor(sensor::Sensor *atc_room_temp_sensor);
-        void set_atc_room_humidity_sensor(sensor::Sensor *atc_room_humidity_sensor);
-        void set_atc_battery_sensor(sensor::Sensor *atc_battery_sensor);
 
         void setup() override;
         void loop() override;
@@ -154,11 +138,7 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         switch_::Switch *save_switch_            = nullptr; /* Switch for save */
 
         sensor::Sensor *current_temperature_sensor_ = nullptr; /* If user wants to replace reported temperature by an external sensor readout */
-        text::Text *atc_mac_address_text_        = nullptr; /* Text input for ATC MAC address */
         sensor::Sensor *ac_indoor_temp_sensor_   = nullptr; /* AC indoor temperature sensor for HA display */
-        sensor::Sensor *atc_room_temp_sensor_    = nullptr; /* ATC room temperature sensor */
-        sensor::Sensor *atc_room_humidity_sensor_ = nullptr; /* ATC room humidity sensor */
-        sensor::Sensor *atc_battery_sensor_      = nullptr; /* ATC battery sensor */
 
         std::string vertical_swing_state_;
         std::string horizontal_swing_state_;
@@ -173,11 +153,9 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         bool xfan_state_;
         bool save_state_;
 
-        uint32_t last_atc_sensor_update_ = 0;  /* Timestamp of last ATC sensor update */
-        bool atc_sensor_valid_ = false;         /* Flag indicating if ATC sensor data is valid */
-        float last_atc_temperature_ = 0;        /* Last received ATC temperature */
-        float last_atc_humidity_ = 0;           /* Last received ATC humidity */
-        float last_atc_battery_ = 0;            /* Last received ATC battery percentage */
+        uint32_t last_external_update_ = 0;     /* Timestamp of last external sensor update */
+        bool atc_failed_ = false;               /* Flag indicating if external sensor has failed/timed out */
+        float last_external_temperature_ = NAN; /* Last received external temperature */
 
         SerialProcess_t serialProcess_;
 
@@ -211,13 +189,9 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void update_xfan(bool xfan);
         void update_save(bool save);
 
-        void check_atc_sensor_timeout();
-        void update_atc_sensor(float temperature, float humidity);
-        void update_atc_battery(float battery_percent);
-        bool is_using_atc_sensor();
+        void check_external_timeout();
 
         void load_preferences_();
-        bool validate_mac_format_(const std::string &mac);
 
         // Helper functions for mapping between string options and uint8_t indices
         uint8_t display_index_from_string_(const std::string &s);
@@ -242,7 +216,6 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         static constexpr uint32_t PREF_KEY_SLEEP = 0x53414308;
         static constexpr uint32_t PREF_KEY_XFAN = 0x53414309;
         static constexpr uint32_t PREF_KEY_SAVE = 0x5341430A;
-        static constexpr uint32_t PREF_KEY_ATC_MAC = 0x5341430B;
 
         ESPPreferenceObject pref_display_;
         ESPPreferenceObject pref_display_unit_;
@@ -254,13 +227,6 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         ESPPreferenceObject pref_sleep_;
         ESPPreferenceObject pref_xfan_;
         ESPPreferenceObject pref_save_;
-        ESPPreferenceObject pref_atc_mac_;
-
-#ifdef USE_ESP32_BLE_TRACKER
-        bool parse_device(const esp32_ble_tracker::ESPBTDevice &device) override;
-        std::string normalize_mac_(const std::string &mac);
-        bool macs_equal_(const std::string &mac1, const std::string &mac2);
-#endif
 
         virtual void on_horizontal_swing_change(const std::string &swing) = 0;
         virtual void on_vertical_swing_change(const std::string &swing) = 0;

@@ -1,36 +1,37 @@
 ---
 # examples/test_gree.yaml
-# Purpose: Minimal reproducible test configuration for Sinclair/Gree AC component v0.0.3
-# - Exercises BLE ATC external sensor selection & persistence (temp source + MAC)
-# - Works even if UART not yet connected (will show only ATC data when available)
+# Purpose: Minimal reproducible test configuration for Sinclair/Gree AC component v0.0.5
+# - Demonstrates external sensor integration (pvvx_mithermometer or any sensor)
+# - Shows 3-state temperature source logic with automatic timeout/recovery
+# - Works even if UART not yet connected (will show only external sensor data when available)
 # - Safe defaults; you can OTA flash immediately
 #
 # Usage Instructions:
 # 1. Replace ssid/password & API/OTA keys with your own.
-# 2. Set the AC Temperature Source to "AC Own Sensor" until UART is wired.
-# 3. Enter your ATC sensor MAC (format AA:BB:CC:DD:EE:FF) then switch source to External ATC Sensor.
-# 4. Reboot -> values (MAC + temp source) should persist internally (no restore_value needed).
-# 5. After wiring UART to indoor unit, AC indoor temperature will appear.
+# 2. Configure an external temperature sensor (example using pvvx_mithermometer below).
+# 3. Set the AC Temperature Source to "External ATC Sensor" to use external sensor.
+# 4. System will automatically switch to "ATC Fail" if no external data for 15 minutes.
+# 5. Automatic recovery to "External ATC Sensor" when external data resumes.
+# 6. Reboot -> temperature source mode (including Fail state) persists internally.
+# 7. After wiring UART to indoor unit, AC indoor temperature will appear.
 #
 # Notes:
 # - Logger level DEBUG for diagnostics; raise to INFO for quieter logs, VERBOSE + build flag for deep debug.
 # - Persistence is internal; DO NOT add restore_value/restore_mode to these entities unless you want YAML-level override.
-# - For invalid or empty MAC, component falls back to AC Own Sensor at boot or after timeout.
-# - ATC timeout: 15 minutes without BLE data triggers fallback.
+# - To change external source sensor, just edit the sensor configuration in YAML and reflash.
+# - Timeout: 15 minutes without external sensor data triggers automatic fallback to "ATC Fail" mode.
 # - To enable extra verbose logging of packet internals: uncomment build_flags with -DSINCLAIR_AC_VERBOSE_LOG and set logger level VERBOSE.
 #
 # Hardware:
-# - ESP32 required for BLE (esp32dev board here).
-# - If you compile on ESP8266, BLE section will be ignored and External ATC won't function.
+# - ESP32 shown here (supports BLE sensors); ESP8266 also works (use non-BLE sensors like DHT, Dallas, etc.).
 #
 # Test Checklist After Flash:
-# [ ] Set MAC, switch to External ATC, observe ATC sensors populate.
-# [ ] Reboot, verify External ATC still selected.
-# [ ] Change to AC Own Sensor, reboot, persists.
-# [ ] Enter invalid MAC (e.g. ZZ:11) while External ATC selected -> fallback logged.
-# [ ] After connecting UART, AC Indoor Temp appears and climate current temp uses selected source.
-#
-# Optional: If you need active scanning (stronger BLE reception), set esp32_ble_tracker.scan_parameters.active: true.
+# [ ] Set source to "External ATC Sensor", observe external sensor data used for climate control.
+# [ ] Reboot, verify "External ATC Sensor" still selected.
+# [ ] Change to "AC Own Sensor", reboot, persists.
+# [ ] Simulate timeout (wait 15 min or temporarily disconnect sensor) -> switches to "ATC Fail".
+# [ ] External sensor resumes -> automatic recovery to "External ATC Sensor".
+# [ ] After connecting UART, AC Indoor Temp appears and climate uses selected source.
 #
 # SECURITY: Replace secrets before deploying.
 
@@ -67,12 +68,24 @@ logger:
   level: DEBUG
   baud_rate: 0
 
-# BLE tracker required for ATC external sensor
+# BLE tracker (optional - only needed if using BLE sensors like pvvx_mithermometer)
+# ESP32 only; comment out for ESP8266 or if not using BLE sensors
 esp32_ble_tracker:
   scan_parameters:
-    active: false   # set true if ATC packets unreliable
+    active: false   # set true if BLE packets unreliable
     interval: 320ms
     window: 30ms
+
+# External temperature sensor configuration
+# Example: Using pvvx_mithermometer BLE sensor
+# For ESP8266 or non-BLE setups, use DHT, Dallas, or other wired sensors instead
+sensor:
+  - platform: pvvx_mithermometer
+    mac_address: "A4:C1:38:0D:10:15"  # Replace with your sensor's MAC
+    temperature:
+      name: "External Room Temperature"
+      id: external_room_temp
+      # This temperature is used when "External ATC Sensor" mode is selected
 
 # UART to AC indoor unit (wire later if not yet connected)
 uart:
@@ -90,43 +103,21 @@ climate:
   - platform: sinclair_ac
     id: sinclair_test_ac
     name: "Test Gree Sinclair AC"
+    
+    # Link external temperature sensor (configured above)
+    current_temperature_sensor: external_room_temp
 
     # Temperature source selection (persisted internally)
+    # Options: "AC Own Sensor", "External ATC Sensor", "ATC Fail"
     temp_source_select:
       name: "AC Temperature Source"
 
-    # ATC MAC address input (persisted internally); must set mode: text
-    atc_mac_address_text:
-      name: "ATC MAC Address"
-      mode: text
-
-    # Sensors published by the component. AC indoor temp will appear after UART connection.
+    # AC's indoor temperature sensor (for monitoring, always available)
     ac_indoor_temp_sensor:
       name: "AC Indoor Temperature"
       accuracy_decimals: 1
       unit_of_measurement: "°C"
       device_class: temperature
-      state_class: measurement
-
-    atc_room_temp_sensor:
-      name: "ATC Room Temperature"
-      accuracy_decimals: 2
-      unit_of_measurement: "°C"
-      device_class: temperature
-      state_class: measurement
-
-    atc_room_humidity_sensor:
-      name: "ATC Room Humidity"
-      accuracy_decimals: 1
-      unit_of_measurement: "%"
-      device_class: humidity
-      state_class: measurement
-
-    atc_battery_sensor:
-      name: "ATC Battery"
-      accuracy_decimals: 0
-      unit_of_measurement: "%"
-      device_class: battery
       state_class: measurement
 
     # Advanced options (persist internally)
