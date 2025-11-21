@@ -169,6 +169,8 @@ class SinclairACCNT : public SinclairAC {
         void setup() override;
         void loop() override;
 
+        void force_resend_last_packet();
+
     protected:
         ACState state_ = ACState::Initializing; /* Stores if the AC is responsive or not */
         ACUpdate update_ = ACUpdate::NoUpdate;  /* Stores if we need tu send update to AC or no */
@@ -179,9 +181,16 @@ class SinclairACCNT : public SinclairAC {
         std::string display_mode_internal_;
         bool display_power_internal_;
 
+        // Power-outage safe: last applied SET payload
+        uint8_t last_packet_payload_[protocol::SET_PACKET_LEN];
+        bool has_last_packet_ = false;
+        bool packet_resent_on_ready_ = false;
+        bool pending_stored_packet_resend_ = false;
+
         bool processUnitReport();
 
         void send_packet();
+        void send_stored_packet_();
 
         bool reqmodechange = false;
         unsigned char lastpacket[60];

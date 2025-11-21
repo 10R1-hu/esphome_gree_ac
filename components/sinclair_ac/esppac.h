@@ -216,6 +216,7 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         static constexpr uint32_t PREF_KEY_SLEEP = 0x53414308;
         static constexpr uint32_t PREF_KEY_XFAN = 0x53414309;
         static constexpr uint32_t PREF_KEY_SAVE = 0x5341430A;
+        static constexpr uint32_t PREF_KEY_LAST_PACKET = 0x5341430B;
 
         ESPPreferenceObject pref_display_;
         ESPPreferenceObject pref_display_unit_;
@@ -227,6 +228,7 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         ESPPreferenceObject pref_sleep_;
         ESPPreferenceObject pref_xfan_;
         ESPPreferenceObject pref_save_;
+        ESPPreferenceObject pref_last_packet_;
 
         virtual void on_horizontal_swing_change(const std::string &swing) = 0;
         virtual void on_vertical_swing_change(const std::string &swing) = 0;
