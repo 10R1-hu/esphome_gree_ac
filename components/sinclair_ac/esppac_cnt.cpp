@@ -1,5 +1,6 @@
 // based on: https://github.com/DomiStyle/esphome-panasonic-ac
 #include "esppac_cnt.h"
+#include <cstring>
 
 namespace esphome {
 namespace sinclair_ac {
@@ -581,11 +582,8 @@ void SinclairACCNT::send_packet()
     /* Save the 45-byte SET payload for power-outage recovery (before CMD/len/checksum/SYNC) */
     if (this->update_ != ACUpdate::NoUpdate)
     {
-        // Copy the 45-byte payload to RAM
-        for (uint8_t i = 0; i < protocol::SET_PACKET_LEN; i++)
-        {
-            this->last_packet_payload_.data[i] = packet[i];
-        }
+        // Copy the 45-byte payload to RAM using memcpy for better performance
+        std::memcpy(this->last_packet_payload_.data, packet.data(), protocol::SET_PACKET_LEN);
         
         // Save to NVS
         this->pref_last_packet_.save(&this->last_packet_payload_);
@@ -1223,14 +1221,15 @@ void SinclairACCNT::send_stored_packet_()
         return;
     }
     
-    // Create packet from stored 45-byte payload
-    std::vector<uint8_t> packet(this->last_packet_payload_.data, this->last_packet_payload_.data + protocol::SET_PACKET_LEN);
+    // Create packet vector and copy stored 45-byte payload
+    std::vector<uint8_t> packet(protocol::SET_PACKET_LEN);
+    std::memcpy(packet.data(), this->last_packet_payload_.data, protocol::SET_PACKET_LEN);
     
     // Add CMD and length
     packet.insert(packet.begin(), protocol::CMD_OUT_PARAMS_SET);
     packet.insert(packet.begin(), protocol::SET_PACKET_LEN + 2); /* Add 2 bytes as we added a command and will add checksum */
     
-    // Calculate and add checksum
+    // Calculate and add checksum - sum of all bytes except sync and checksum itself (modulo 0x100 via uint8_t)
     uint8_t checksum = 0;
     for (uint8_t i = 0 ; i < packet.size() ; i++)
     {

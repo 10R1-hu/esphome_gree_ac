@@ -20,7 +20,7 @@ enum class ACUpdate {
 
 // Structure for storing the 45-byte SET packet payload in NVS
 struct LastPacketPayload {
-    uint8_t data[45];  // protocol::SET_PACKET_LEN bytes
+    uint8_t data[45];  // Must match protocol::SET_PACKET_LEN (45 bytes)
 };
 
 namespace protocol {
