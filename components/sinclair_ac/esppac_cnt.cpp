@@ -204,6 +204,13 @@ void SinclairACCNT::control(const climate::ClimateCall &call)
                 break;
         }
     }
+    // If we're accepting control while AC is not Ready (ignore_ready_check enabled),
+    // publish the optimistic state immediately so Home Assistant reflects the user's request
+    // even before the physical unit responds.
+    if (this->state_ != ACState::Ready && this->ignore_ready_check_)
+    {
+        this->publish_state();
+    }
 }
 
 /*
@@ -213,10 +220,16 @@ void SinclairACCNT::send_packet()
 {
     std::vector<uint8_t> packet(protocol::SET_PACKET_LEN, 0);  /* Initialize packet contents */
 
-    if (this->wait_response_ == true || (millis() - this->last_packet_sent_ < protocol::TIME_REFRESH_PERIOD_MS))
-    {
-        /* do net send packet too often or when we are waiting for report to come */
-        return;
+    // When ignore_ready_check_ is enabled and the AC is not Ready, allow a send
+    // attempt even if we are waiting for response. This helps to emit TX
+    // frames for debugging or when the AC isn't yet responding. Still respect
+    // the refresh period in general to avoid spamming the bus.
+    if (!(this->ignore_ready_check_ && this->state_ != ACState::Ready)) {
+        if (this->wait_response_ == true || (millis() - this->last_packet_sent_ < protocol::TIME_REFRESH_PERIOD_MS))
+        {
+            /* do not send packet too often or when we are waiting for report to come */
+            return;
+        }
     }
     
     packet[protocol::SET_CONST_02_BYTE] = protocol::SET_CONST_02_VAL; /* Some always 0x02 byte... */
