@@ -1,6 +1,6 @@
 # Open source WIFI module replacement for Gree protocol based AC's for Home Assistant.
 
-**Version: v0.0.5**
+**Version: v0.0.6**
 
 This repository adds support for ESP-based WiFi modules to interface with Gree/Sinclair AC units.
 It's forked from https://github.com/piotrva/esphome_gree_ac, big thanks to @piotrva for his work!
@@ -157,6 +157,38 @@ From version 0.0.5 onwards, all user preferences are automatically persisted acr
 - **Fail state persistence**: If system is in "ATC Fail" mode during reboot, it restores to that state
 
 This means your AC will maintain its configuration exactly as you left it, without any additional YAML configuration!
+
+## Power-Outage Safe Behavior (v0.0.6+)
+
+From version 0.0.6 onwards, the component includes automatic recovery from power outages:
+
+### How It Works:
+When you change any AC setting through Home Assistant (temperature, mode, fan speed, swing position, etc.), the component automatically saves the complete 45-byte SET command payload to non-volatile storage (NVS/flash). On the next boot:
+
+1. **Automatic Restore**: As soon as the AC unit becomes ready (UART communication established), the ESP automatically re-sends the last saved command packet to the AC
+2. **Same Settings**: The AC returns to exactly the same configuration that was last applied, even if Home Assistant is unavailable
+3. **One-Time Only**: The automatic restore happens only once per boot to avoid repeated unnecessary commands
+
+### Why This Matters:
+Since the ESP32 is powered from the AC board over UART, a power outage reboots both devices simultaneously. Without this feature, the AC would return to its default settings and wait for Home Assistant to reconnect and push new settings. With power-outage safe behavior, the AC proactively restores its last configuration automatically.
+
+### Manual Trigger:
+You can manually trigger re-sending the last stored packet using the `force_resend_last_packet()` method from YAML lambdas or template buttons:
+
+```yaml
+button:
+  - platform: template
+    name: "Resend Last AC Settings"
+    on_press:
+      - lambda: |-
+          id(sinclair_ac_id).force_resend_last_packet();
+```
+
+### Technical Details:
+- **Storage**: 45-byte payload saved to ESP32 NVS (flash memory)
+- **Trigger**: Automatic on AC Ready state after boot
+- **Logging**: DEBUG level for save operations, INFO level for resend operations
+- **Persistence**: Survives power cycles, ESP reboots, and firmware updates
 
 # HOW TO 
 You can flash this to an ESP module. I used an ESP01-M module, like this one:
