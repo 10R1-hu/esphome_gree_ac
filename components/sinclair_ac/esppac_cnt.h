@@ -175,6 +175,12 @@ class SinclairACCNT : public SinclairAC {
         void loop() override;
 
         void force_resend_last_packet();
+        // For testing: inject the last saved SET payload as if it was received from the AC
+        void inject_saved_packet();
+        // Inject a constructed unit-report that shows:
+        // power OFF, display OFF, Celsius, vertical+horizontal swing OFF,
+        // beeper OFF, all extras OFF except plasma ON.
+        void inject_default_report();
 
     protected:
         ACState state_ = ACState::Initializing; /* Stores if the AC is responsive or not */

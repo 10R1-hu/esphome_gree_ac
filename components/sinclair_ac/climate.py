@@ -5,6 +5,7 @@ from esphome.const import (
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import uart, climate, sensor, select, switch
+from esphome.components import text_sensor
 
 AUTO_LOAD = ["switch", "sensor", "select"]
 DEPENDENCIES = ["uart"]
@@ -40,6 +41,8 @@ CONF_SAVE_SWITCH                = "save_switch"
 CONF_CURRENT_TEMPERATURE_SENSOR = "current_temperature_sensor"
 CONF_AC_INDOOR_TEMP_SENSOR      = "ac_indoor_temp_sensor"
 CONF_IGNORE_READY_SWITCH        = "ignore_ready_switch"
+CONF_DEBUG_TX_SENSOR            = "debug_tx_sensor"
+CONF_DEBUG_RX_SENSOR            = "debug_rx_sensor"
 
 HORIZONTAL_SWING_OPTIONS = [
     "0 - OFF",
@@ -102,6 +105,8 @@ SCHEMA = climate.climate_schema(SinclairACCNT).extend(
         cv.Optional(CONF_XFAN_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_SAVE_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_AC_INDOOR_TEMP_SENSOR): sensor.sensor_schema(),
+            cv.Optional(CONF_DEBUG_TX_SENSOR): text_sensor.text_sensor_schema(),
+            cv.Optional(CONF_DEBUG_RX_SENSOR): text_sensor.text_sensor_schema(),
         cv.Optional(CONF_IGNORE_READY_CHECK): cv.boolean,
         cv.Optional(CONF_IGNORE_READY_SWITCH): SWITCH_SCHEMA,
     }
@@ -164,6 +169,16 @@ async def to_code(config):
         conf = config[CONF_AC_INDOOR_TEMP_SENSOR]
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_ac_indoor_temp_sensor(sens))
+    if CONF_DEBUG_TX_SENSOR in config:
+        conf = config[CONF_DEBUG_TX_SENSOR]
+        tx = await text_sensor.new_text_sensor(conf)
+        await cg.register_component(tx, conf)
+        cg.add(var.set_debug_tx_text_sensor(tx))
+    if CONF_DEBUG_RX_SENSOR in config:
+        conf = config[CONF_DEBUG_RX_SENSOR]
+        rx = await text_sensor.new_text_sensor(conf)
+        await cg.register_component(rx, conf)
+        cg.add(var.set_debug_rx_text_sensor(rx))
         
     for s in [CONF_PLASMA_SWITCH, CONF_BEEPER_SWITCH, CONF_SLEEP_SWITCH, CONF_XFAN_SWITCH, CONF_SAVE_SWITCH, CONF_IGNORE_READY_SWITCH]:
         if s in config:

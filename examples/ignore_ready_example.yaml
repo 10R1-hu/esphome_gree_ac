@@ -30,6 +30,7 @@ external_components:
 
 climate:
   - platform: sinclair_ac
+    id: sinclair_ac_id
     name: "Bedroom AC"
     # If true, accept control commands even when AC is not Ready
     ignore_ready_check: true
@@ -42,3 +43,10 @@ climate:
       name: "Beeper"
     plasma_switch:
       name: "Plasma"
+
+button:
+  - platform: template
+    name: "Inject Sinclair Default Report"
+    on_press:
+      - lambda: |-
+          id(sinclair_ac_id).inject_default_report();

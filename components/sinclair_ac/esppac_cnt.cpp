@@ -1271,6 +1271,109 @@ void SinclairACCNT::send_stored_packet_()
     this->update_ = ACUpdate::NoUpdate;
 }
 
+/*
+ * Testing helper: inject the saved 45-byte payload as if it was received
+ * from the AC unit. This will construct a framed `CMD_IN_UNIT_REPORT`
+ * packet from `last_packet_payload_`, set it into the receive buffer and
+ * mark the serial state as `STATE_COMPLETE` so the main loop will process it
+ * exactly as if the AC had sent it.
+ */
+void SinclairACCNT::inject_saved_packet()
+{
+    if (!this->has_last_packet_)
+    {
+        ESP_LOGW(TAG, "inject_saved_packet called but no saved packet available");
+        return;
+    }
+
+    std::vector<uint8_t> packet(protocol::SET_PACKET_LEN);
+    std::memcpy(packet.data(), this->last_packet_payload_.data, protocol::SET_PACKET_LEN);
+
+    // Prepend command and length (mimic incoming unit report)
+    packet.insert(packet.begin(), protocol::CMD_IN_UNIT_REPORT);
+    packet.insert(packet.begin(), protocol::SET_PACKET_LEN + 2);
+
+    // Calculate checksum over length + cmd + payload
+    uint8_t checksum = 0;
+    for (uint8_t i = 0; i < packet.size(); i++)
+        checksum += packet[i];
+    packet.push_back(checksum);
+
+    // Prepend sync bytes
+    packet.insert(packet.begin(), protocol::SYNC);
+    packet.insert(packet.begin(), protocol::SYNC);
+
+    // Inject into serial receive buffer and mark complete so loop() will handle it
+    this->serialProcess_.data = packet;
+    this->serialProcess_.state = STATE_COMPLETE;
+    ESP_LOGI(TAG, "Injected saved packet as incoming (simulated unit report)");
+}
+
+void SinclairACCNT::inject_default_report()
+{
+    // Build a 45-byte payload with the requested default feedback:
+    // - power OFF
+    // - display OFF
+    // - Celsius units
+    // - vertical and horizontal swing OFF
+    // - beeper OFF
+    // - all extras OFF except plasma ON
+
+    std::vector<uint8_t> payload(protocol::SET_PACKET_LEN, 0);
+
+    // Ensure power bit cleared => CLIMATE_MODE_OFF will be reported
+    // Leave mode bits at 0 (auto/unused when power=0)
+
+    // Display off: leave REPORT_DISP_ON_BYTE bit cleared (0)
+    // Display unit Celsius: REPORT_DISP_F_MASK cleared (0)
+
+    // Vertical and horizontal swing set to OFF
+    payload[protocol::REPORT_VSWING_BYTE] |= (protocol::REPORT_VSWING_OFF << protocol::REPORT_VSWING_POS);
+    payload[protocol::REPORT_HSWING_BYTE] |= (protocol::REPORT_HSWING_OFF << protocol::REPORT_HSWING_POS);
+
+    // Plasma ON: set both plasma masks as send_packet does
+    payload[protocol::REPORT_PLASMA1_BYTE] |= protocol::REPORT_PLASMA1_MASK;
+    payload[protocol::REPORT_PLASMA2_BYTE] |= protocol::REPORT_PLASMA2_MASK;
+
+    // Beeper OFF: setting the beeper mask (send_packet sets this mask when beeper_state_ == false)
+    payload[protocol::REPORT_BEEPER_BYTE] |= protocol::REPORT_BEEPER_MASK;
+
+    // Make sure sleep/xfan/save are OFF (leave bits 0)
+
+    // Build full framed packet as incoming unit report
+    std::vector<uint8_t> packet = payload;
+    packet.insert(packet.begin(), protocol::CMD_IN_UNIT_REPORT);
+    packet.insert(packet.begin(), protocol::SET_PACKET_LEN + 2);
+
+    uint8_t checksum = 0;
+    for (uint8_t i = 0; i < packet.size(); i++) checksum += packet[i];
+    packet.push_back(checksum);
+
+    packet.insert(packet.begin(), protocol::SYNC);
+    packet.insert(packet.begin(), protocol::SYNC);
+
+    // Also explicitly update beeper state so HA reflects beeper OFF (processUnitReport doesn't update beeper)
+    this->update_beeper(false);
+
+    // Inject and mark complete so loop() processes it
+    this->serialProcess_.data = packet;
+    this->serialProcess_.state = STATE_COMPLETE;
+    ESP_LOGI(TAG, "Injected default simulated unit report (power OFF, display OFF, °C, swings OFF, beeper OFF, plasma ON)");
+}
+
+void SinclairACCNT::on_ignore_ready_changed(bool state)
+{
+    // When ignore-ready is turned ON we want to simulate a received unit report
+    // (RX) so the component transitions to Ready and the normal TX flow continues.
+    if (!state)
+        return;
+
+    ESP_LOGI(TAG, "ignore_ready_check enabled — injecting simulated RX unit report to mark AC Ready");
+
+    // Inject a report that reflects the user's desired default feedback
+    inject_default_report();
+}
+
 }  // namespace CNT
 }  // namespace sinclair_ac
 }  // namespace esphome

@@ -546,6 +546,8 @@ void SinclairAC::set_ignore_ready_check(bool v)
             this->ignore_ready_switch_->publish_state(this->ignore_ready_check_);
     }
     ESP_LOGD(TAG, "ignore_ready_check set to %d", this->ignore_ready_check_);
+    // Notify derived classes (protocol implementations) about the change
+    this->on_ignore_ready_changed(this->ignore_ready_check_);
 }
 
 void SinclairAC::set_beeper_switch(switch_::Switch *beeper_switch)
@@ -556,6 +558,16 @@ void SinclairAC::set_beeper_switch(switch_::Switch *beeper_switch)
             return;
         this->on_beeper_change(state);
     });
+}
+
+void SinclairAC::set_debug_tx_text_sensor(text_sensor::TextSensor *tx)
+{
+    this->debug_tx_text_sensor_ = tx;
+}
+
+void SinclairAC::set_debug_rx_text_sensor(text_sensor::TextSensor *rx)
+{
+    this->debug_rx_text_sensor_ = rx;
 }
 
 void SinclairAC::set_sleep_switch(switch_::Switch *sleep_switch)
@@ -762,9 +774,17 @@ void SinclairAC::load_preferences_()
 void SinclairAC::log_packet(std::vector<uint8_t> data, bool outgoing)
 {
     if (outgoing) {
-        ESP_LOGI(TAG, "TX: %s", format_hex_pretty(data).c_str());
+        std::string hex = format_hex_pretty(data);
+        ESP_LOGI(TAG, "TX: %s", hex.c_str());
+        if (this->debug_tx_text_sensor_ != nullptr) {
+            this->debug_tx_text_sensor_->publish_state(hex);
+        }
     } else {
-        ESP_LOGV(TAG, "RX: %s", format_hex_pretty(data).c_str());
+        std::string hex = format_hex_pretty(data);
+        ESP_LOGV(TAG, "RX: %s", hex.c_str());
+        if (this->debug_rx_text_sensor_ != nullptr) {
+            this->debug_rx_text_sensor_->publish_state(hex);
+        }
     }
 }
 
