@@ -105,8 +105,18 @@ SCHEMA = climate.climate_schema(SinclairACCNT).extend(
         cv.Optional(CONF_XFAN_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_SAVE_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_AC_INDOOR_TEMP_SENSOR): sensor.sensor_schema(),
-            cv.Optional(CONF_DEBUG_TX_SENSOR): text_sensor.text_sensor_schema(),
-            cv.Optional(CONF_DEBUG_RX_SENSOR): text_sensor.text_sensor_schema(),
+        # Accept either a direct ID reference (e.g. debug_tx_sensor: ac_last_tx),
+        # or a full inline text_sensor definition.
+        cv.Optional(CONF_DEBUG_TX_SENSOR): cv.one_of(
+            cv.use_id(text_sensor.TextSensor),
+            text_sensor.text_sensor_schema(),
+            upper=False,
+        ),
+        cv.Optional(CONF_DEBUG_RX_SENSOR): cv.one_of(
+            cv.use_id(text_sensor.TextSensor),
+            text_sensor.text_sensor_schema(),
+            upper=False,
+        ),
         cv.Optional(CONF_IGNORE_READY_CHECK): cv.boolean,
         cv.Optional(CONF_IGNORE_READY_SWITCH): SWITCH_SCHEMA,
     }
@@ -171,13 +181,20 @@ async def to_code(config):
         cg.add(var.set_ac_indoor_temp_sensor(sens))
     if CONF_DEBUG_TX_SENSOR in config:
         conf = config[CONF_DEBUG_TX_SENSOR]
-        tx = await text_sensor.new_text_sensor(conf)
-        await cg.register_component(tx, conf)
+        # `conf` can be an ID reference (resolved by cv.use_id) or a dict for inline
+        if isinstance(conf, dict):
+            tx = await text_sensor.new_text_sensor(conf)
+            await cg.register_component(tx, conf)
+        else:
+            tx = await cg.get_variable(conf)
         cg.add(var.set_debug_tx_text_sensor(tx))
     if CONF_DEBUG_RX_SENSOR in config:
         conf = config[CONF_DEBUG_RX_SENSOR]
-        rx = await text_sensor.new_text_sensor(conf)
-        await cg.register_component(rx, conf)
+        if isinstance(conf, dict):
+            rx = await text_sensor.new_text_sensor(conf)
+            await cg.register_component(rx, conf)
+        else:
+            rx = await cg.get_variable(conf)
         cg.add(var.set_debug_rx_text_sensor(rx))
         
     for s in [CONF_PLASMA_SWITCH, CONF_BEEPER_SWITCH, CONF_SLEEP_SWITCH, CONF_XFAN_SWITCH, CONF_SAVE_SWITCH, CONF_IGNORE_READY_SWITCH]:

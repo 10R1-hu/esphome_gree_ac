@@ -1,0 +1,143 @@
+esphome:
+  name: kisszobagree
+  friendly_name: kisszobagree
+
+web_server:
+  port: 80
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: "zINj1ZwylIeAPnGr8FcpwRHHOxOybpM+x+wVEURZESY="
+  reboot_timeout: 0s        # Ne rebootoljon HA kapcsolat hiányában
+
+
+ota:
+  - platform: esphome
+    password: "4c43cd4b75fd9e3aa17132cc5ef239c8"
+
+wifi:
+  ssid: "Chicago"
+  password: "nemingyenvan"
+  fast_connect: true         # Ha ismert csatornán van, gyorsabb csatlakozás
+  ap:
+    ssid: "Kisszobagree Fallback Hotspot"
+    password: "nemondomeg"
+
+captive_portal:
+
+# ------------- BLE TRACKER (aktív mód, megbízhatóbb induláskor) -------------
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 300ms
+    window: 300ms
+    active: true
+
+# ------------- ATC PVVX SZENZOR -------------
+sensor:
+  - platform: pvvx_mithermometer
+    mac_address: "A4:C1:38:9A:D3:12"
+    temperature:
+      name: "ATC Room Temperature"
+      id: external_atc_temp
+      unit_of_measurement: "°C"
+      accuracy_decimals: 2
+      device_class: temperature
+      state_class: measurement
+      force_update: true
+
+    humidity:
+      name: "ATC Room Humidity"
+      id: external_atc_humidity
+      unit_of_measurement: "%"
+      accuracy_decimals: 1
+      device_class: humidity
+      state_class: measurement
+      filters:
+        - heartbeat: 120s
+    battery_level:
+      name: "ATC Battery"
+      id: external_atc_battery
+      unit_of_measurement: "%"
+      accuracy_decimals: 0
+      device_class: battery
+      state_class: measurement
+      filters:
+        - throttle: 60s
+
+# ------------- UART AC PROTOKOLL -------------
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 4800
+  parity: EVEN
+
+# ------------- EXTERNAL COMPONENT (Sinclair/Gree) -------------
+external_components:
+  - source: github://10R1-hu/esphome_gree_ac
+    components: [sinclair_ac]
+    refresh: 0s
+
+text_sensor:
+  - platform: template
+    name: "AC Last TX (private)"
+    id: ac_last_tx_private
+
+  - platform: template
+    name: "AC Last RX (private)"
+    id: ac_last_rx_private
+
+# ------------- KLÍMA -------------
+climate:
+  - platform: sinclair_ac
+    id: kisszoba_sinclair_ac
+    name: "Kisszoba Sinclair AC"
+    ignore_ready_check: true
+    # Optional runtime switch to toggle the behavior from Home Assistant UI
+    ignore_ready_switch:
+      name: "AC Ignore Ready Check"
+    current_temperature_sensor: external_atc_temp
+    temp_source_select:
+      name: "AC Temperature Source"
+
+    ac_indoor_temp_sensor:
+      name: "AC Indoor Temp"
+      accuracy_decimals: 2
+      unit_of_measurement: "°C"
+
+    vertical_swing_select:
+      name: "AC Vertical Swing"
+    horizontal_swing_select:
+      name: "AC Horizontal Swing"
+    display_select:
+      name: "AC Display Mode"
+    display_unit_select:
+      name: "AC Display Unit"
+    plasma_switch:
+      name: "AC Plasma Switch"
+    beeper_switch:
+      name: "AC Beeper Switch"
+    sleep_switch:
+      name: "AC Sleep Mode"
+    xfan_switch:
+      name: "AC Xfan Mode"
+    save_switch:
+      name: "AC Save Mode"
+
+    # Debug text sensors (show last TX/RX hexdumps)
+    debug_tx_sensor: ac_last_tx_private
+    debug_rx_sensor: ac_last_rx_private
+
+button:
+  - platform: template
+    name: "Inject Sinclair Default Report"
+    on_press:
+      - lambda: |-
+          id(kisszoba_sinclair_ac).inject_default_report();

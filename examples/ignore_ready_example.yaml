@@ -28,6 +28,15 @@ external_components:
   - source: github://10R1-hu/esphome_gree_ac
     components: [sinclair_ac]
 
+text_sensor:
+  - platform: template
+    name: "AC Last TX"
+    id: ac_last_tx_example
+
+  - platform: template
+    name: "AC Last RX"
+    id: ac_last_rx_example
+
 climate:
   - platform: sinclair_ac
     id: sinclair_ac_id
@@ -38,7 +47,13 @@ climate:
     ignore_ready_switch:
       name: "AC Ignore Ready Check"
 
-    # Optional: other switches/selects as needed
+    # Debug text sensors (show last TX/RX hexdumps)
+    debug_tx_sensor:
+      id: ac_last_tx_example
+    debug_rx_sensor:
+      id: ac_last_rx_example
+
+    # Optional: other switches/selects as needed 
     beeper_switch:
       name: "Beeper"
     plasma_switch:
