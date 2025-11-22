@@ -132,13 +132,8 @@ void SinclairACCNT::loop()
 
 void SinclairACCNT::control(const climate::ClimateCall &call)
 {
-    if (this->state_ != ACState::Ready && !this->ignore_ready_check_)
+    if (this->state_ != ACState::Ready)
         return;
-    if (this->state_ != ACState::Ready && this->ignore_ready_check_)
-    {
-        ESP_LOGW(TAG, "AC not Ready — accepting control because ignore_ready_check is enabled");
-        // continue and accept control; this will set update_ and internal fields
-    }
 
     if (call.get_mode().has_value())
     {
@@ -204,13 +199,6 @@ void SinclairACCNT::control(const climate::ClimateCall &call)
                 break;
         }
     }
-    // If we're accepting control while AC is not Ready (ignore_ready_check enabled),
-    // publish the optimistic state immediately so Home Assistant reflects the user's request
-    // even before the physical unit responds.
-    if (this->state_ != ACState::Ready && this->ignore_ready_check_)
-    {
-        this->publish_state();
-    }
 }
 
 /*
@@ -224,12 +212,10 @@ void SinclairACCNT::send_packet()
     // attempt even if we are waiting for response. This helps to emit TX
     // frames for debugging or when the AC isn't yet responding. Still respect
     // the refresh period in general to avoid spamming the bus.
-    if (!(this->ignore_ready_check_ && this->state_ != ACState::Ready)) {
-        if (this->wait_response_ == true || (millis() - this->last_packet_sent_ < protocol::TIME_REFRESH_PERIOD_MS))
-        {
-            /* do not send packet too often or when we are waiting for report to come */
-            return;
-        }
+    if (this->wait_response_ == true || (millis() - this->last_packet_sent_ < protocol::TIME_REFRESH_PERIOD_MS))
+    {
+        /* do not send packet too often or when we are waiting for report to come */
+        return;
     }
     
     packet[protocol::SET_CONST_02_BYTE] = protocol::SET_CONST_02_VAL; /* Some always 0x02 byte... */
@@ -1361,18 +1347,7 @@ void SinclairACCNT::inject_default_report()
     ESP_LOGI(TAG, "Injected default simulated unit report (power OFF, display OFF, °C, swings OFF, beeper OFF, plasma ON)");
 }
 
-void SinclairACCNT::on_ignore_ready_changed(bool state)
-{
-    // When ignore-ready is turned ON we want to simulate a received unit report
-    // (RX) so the component transitions to Ready and the normal TX flow continues.
-    if (!state)
-        return;
-
-    ESP_LOGI(TAG, "ignore_ready_check enabled — injecting simulated RX unit report to mark AC Ready");
-
-    // Inject a report that reflects the user's desired default feedback
-    inject_default_report();
-}
+// (ignore_ready feature removed)
 
 }  // namespace CNT
 }  // namespace sinclair_ac

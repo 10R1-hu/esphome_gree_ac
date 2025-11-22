@@ -30,7 +30,6 @@ CONF_VERTICAL_SWING_SELECT      = "vertical_swing_select"
 CONF_DISPLAY_SELECT             = "display_select"
 CONF_DISPLAY_UNIT_SELECT        = "display_unit_select"
 CONF_TEMP_SOURCE_SELECT         = "temp_source_select"
-CONF_IGNORE_READY_CHECK         = "ignore_ready_check"
 
 CONF_PLASMA_SWITCH              = "plasma_switch"
 CONF_BEEPER_SWITCH              = "beeper_switch"
@@ -40,7 +39,6 @@ CONF_SAVE_SWITCH                = "save_switch"
 
 CONF_CURRENT_TEMPERATURE_SENSOR = "current_temperature_sensor"
 CONF_AC_INDOOR_TEMP_SENSOR      = "ac_indoor_temp_sensor"
-CONF_IGNORE_READY_SWITCH        = "ignore_ready_switch"
 CONF_DEBUG_TX_SENSOR            = "debug_tx_sensor"
 CONF_DEBUG_RX_SENSOR            = "debug_rx_sensor"
 
@@ -109,16 +107,17 @@ SCHEMA = climate.climate_schema(SinclairACCNT).extend(
         # or a full inline text_sensor definition.
         cv.Optional(CONF_DEBUG_TX_SENSOR): cv.one_of(
             cv.use_id(text_sensor.TextSensor),
+            cv.Schema({cv.Required(CONF_ID): cv.use_id(text_sensor.TextSensor)}),
             text_sensor.text_sensor_schema(),
             upper=False,
         ),
         cv.Optional(CONF_DEBUG_RX_SENSOR): cv.one_of(
             cv.use_id(text_sensor.TextSensor),
+            cv.Schema({cv.Required(CONF_ID): cv.use_id(text_sensor.TextSensor)}),
             text_sensor.text_sensor_schema(),
             upper=False,
         ),
-        cv.Optional(CONF_IGNORE_READY_CHECK): cv.boolean,
-        cv.Optional(CONF_IGNORE_READY_SWITCH): SWITCH_SCHEMA,
+        
     }
 ).extend(uart.UART_DEVICE_SCHEMA)
 
@@ -171,9 +170,6 @@ async def to_code(config):
         sens = await cg.get_variable(config[CONF_CURRENT_TEMPERATURE_SENSOR])
         cg.add(var.set_current_temperature_sensor(sens))
 
-    if CONF_IGNORE_READY_CHECK in config:
-        cg.add(var.set_ignore_ready_check(config[CONF_IGNORE_READY_CHECK]))
-
 
     if CONF_AC_INDOOR_TEMP_SENSOR in config:
         conf = config[CONF_AC_INDOOR_TEMP_SENSOR]
@@ -181,23 +177,29 @@ async def to_code(config):
         cg.add(var.set_ac_indoor_temp_sensor(sens))
     if CONF_DEBUG_TX_SENSOR in config:
         conf = config[CONF_DEBUG_TX_SENSOR]
-        # `conf` can be an ID reference (resolved by cv.use_id) or a dict for inline
+        # `conf` can be a bare ID, a mapping with 'id', or an inline text_sensor dict
         if isinstance(conf, dict):
-            tx = await text_sensor.new_text_sensor(conf)
-            await cg.register_component(tx, conf)
+            if CONF_ID in conf:
+                tx = await cg.get_variable(conf[CONF_ID])
+            else:
+                tx = await text_sensor.new_text_sensor(conf)
+                await cg.register_component(tx, conf)
         else:
             tx = await cg.get_variable(conf)
         cg.add(var.set_debug_tx_text_sensor(tx))
     if CONF_DEBUG_RX_SENSOR in config:
         conf = config[CONF_DEBUG_RX_SENSOR]
         if isinstance(conf, dict):
-            rx = await text_sensor.new_text_sensor(conf)
-            await cg.register_component(rx, conf)
+            if CONF_ID in conf:
+                rx = await cg.get_variable(conf[CONF_ID])
+            else:
+                rx = await text_sensor.new_text_sensor(conf)
+                await cg.register_component(rx, conf)
         else:
             rx = await cg.get_variable(conf)
         cg.add(var.set_debug_rx_text_sensor(rx))
         
-    for s in [CONF_PLASMA_SWITCH, CONF_BEEPER_SWITCH, CONF_SLEEP_SWITCH, CONF_XFAN_SWITCH, CONF_SAVE_SWITCH, CONF_IGNORE_READY_SWITCH]:
+    for s in [CONF_PLASMA_SWITCH, CONF_BEEPER_SWITCH, CONF_SLEEP_SWITCH, CONF_XFAN_SWITCH, CONF_SAVE_SWITCH]:
         if s in config:
             conf = config[s]
             a_switch = cg.new_Pvariable(conf[CONF_ID])

@@ -85,14 +85,11 @@ external_components:
     components: [sinclair_ac]
     refresh: 0s
 
-text_sensor:
-  - platform: template
-    name: "AC Last TX (private)"
-    id: ac_last_tx_private
-
-  - platform: template
-    name: "AC Last RX (private)"
-    id: ac_last_rx_private
+# Debug text sensors moved inline under the climate component to avoid
+# duplicate/unknown id validation when using external component schema.
+# Top-level debug text sensors (template) so ids can be referenced by the
+# climate component. Keeping them top-level avoids validator issues when
+# resolving `cv.use_id` references.
 
 # ------------- KLÍMA -------------
 climate:
@@ -100,9 +97,7 @@ climate:
     id: kisszoba_sinclair_ac
     name: "Kisszoba Sinclair AC"
     ignore_ready_check: true
-    # Optional runtime switch to toggle the behavior from Home Assistant UI
-    ignore_ready_switch:
-      name: "AC Ignore Ready Check"
+    # (runtime ignore-ready switch removed for testing)
     current_temperature_sensor: external_atc_temp
     temp_source_select:
       name: "AC Temperature Source"
@@ -131,9 +126,6 @@ climate:
     save_switch:
       name: "AC Save Mode"
 
-    # Debug text sensors (show last TX/RX hexdumps)
-    debug_tx_sensor: ac_last_tx_private
-    debug_rx_sensor: ac_last_rx_private
 
 button:
   - platform: template

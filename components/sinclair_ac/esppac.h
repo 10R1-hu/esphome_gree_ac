@@ -118,12 +118,8 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void set_xfan_switch(switch_::Switch *plasma_switch);
         void set_save_switch(switch_::Switch *plasma_switch);
         
-        void set_ignore_ready_switch(switch_::Switch *ignore_ready_switch);
-        void set_ignore_ready_check(bool v);
         void set_debug_tx_text_sensor(text_sensor::TextSensor *tx);
         void set_debug_rx_text_sensor(text_sensor::TextSensor *rx);
-        // Hook called when ignore_ready_check changes (override in protocol implementations)
-        virtual void on_ignore_ready_changed(bool state) {};
 
         void set_current_temperature_sensor(sensor::Sensor *current_temperature_sensor);
         void set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor);
@@ -145,9 +141,7 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         switch_::Switch *xfan_switch_            = nullptr; /* Switch for X-fan */
         switch_::Switch *save_switch_            = nullptr; /* Switch for save */
 
-        // Runtime control: optional switch to allow accepting controls when AC not Ready
-        switch_::Switch *ignore_ready_switch_   = nullptr; /* Switch to allow controls when AC not Ready */
-        bool ignore_ready_check_ = false; /* If true, accept controls even when AC not Ready */
+        // (ignore_ready feature removed)
         
         
 

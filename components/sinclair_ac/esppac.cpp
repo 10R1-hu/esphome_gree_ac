@@ -527,28 +527,6 @@ void SinclairAC::set_plasma_switch(switch_::Switch *plasma_switch)
     });
 }
 
-void SinclairAC::set_ignore_ready_switch(switch_::Switch *ignore_ready_switch)
-{
-    this->ignore_ready_switch_ = ignore_ready_switch;
-    this->ignore_ready_switch_->add_on_state_callback([this](bool state) {
-        if (state == this->ignore_ready_check_)
-            return;
-        this->set_ignore_ready_check(state);
-    });
-}
-
-void SinclairAC::set_ignore_ready_check(bool v)
-{
-    this->ignore_ready_check_ = v;
-    if (this->ignore_ready_switch_ != nullptr)
-    {
-        if (this->ignore_ready_switch_->state != this->ignore_ready_check_)
-            this->ignore_ready_switch_->publish_state(this->ignore_ready_check_);
-    }
-    ESP_LOGD(TAG, "ignore_ready_check set to %d", this->ignore_ready_check_);
-    // Notify derived classes (protocol implementations) about the change
-    this->on_ignore_ready_changed(this->ignore_ready_check_);
-}
 
 void SinclairAC::set_beeper_switch(switch_::Switch *beeper_switch)
 {

@@ -41,17 +41,7 @@ climate:
   - platform: sinclair_ac
     id: sinclair_ac_id
     name: "Bedroom AC"
-    # If true, accept control commands even when AC is not Ready
-    ignore_ready_check: true
-    # Optional runtime switch to toggle the behavior from Home Assistant UI
-    ignore_ready_switch:
-      name: "AC Ignore Ready Check"
-
-    # Debug text sensors (show last TX/RX hexdumps)
-    debug_tx_sensor:
-      id: ac_last_tx_example
-    debug_rx_sensor:
-      id: ac_last_rx_example
+    # Note: ignore-ready behavior not enabled in this example.
 
     # Optional: other switches/selects as needed 
     beeper_switch:
