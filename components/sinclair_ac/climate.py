@@ -5,7 +5,6 @@ from esphome.const import (
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import uart, climate, sensor, select, switch
-from esphome.components import text_sensor
 
 AUTO_LOAD = ["switch", "sensor", "select"]
 DEPENDENCIES = ["uart"]
@@ -39,8 +38,6 @@ CONF_SAVE_SWITCH                = "save_switch"
 
 CONF_CURRENT_TEMPERATURE_SENSOR = "current_temperature_sensor"
 CONF_AC_INDOOR_TEMP_SENSOR      = "ac_indoor_temp_sensor"
-CONF_DEBUG_TX_SENSOR            = "debug_tx_sensor"
-CONF_DEBUG_RX_SENSOR            = "debug_rx_sensor"
 
 HORIZONTAL_SWING_OPTIONS = [
     "0 - OFF",
@@ -103,20 +100,7 @@ SCHEMA = climate.climate_schema(SinclairACCNT).extend(
         cv.Optional(CONF_XFAN_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_SAVE_SWITCH): SWITCH_SCHEMA,
         cv.Optional(CONF_AC_INDOOR_TEMP_SENSOR): sensor.sensor_schema(),
-        # Accept either a direct ID reference (e.g. debug_tx_sensor: ac_last_tx),
-        # or a full inline text_sensor definition.
-        cv.Optional(CONF_DEBUG_TX_SENSOR): cv.one_of(
-            cv.use_id(text_sensor.TextSensor),
-            cv.Schema({cv.Required(CONF_ID): cv.use_id(text_sensor.TextSensor)}),
-            text_sensor.text_sensor_schema(),
-            upper=False,
-        ),
-        cv.Optional(CONF_DEBUG_RX_SENSOR): cv.one_of(
-            cv.use_id(text_sensor.TextSensor),
-            cv.Schema({cv.Required(CONF_ID): cv.use_id(text_sensor.TextSensor)}),
-            text_sensor.text_sensor_schema(),
-            upper=False,
-        ),
+        # (debug TX/RX text sensors removed)
         
     }
 ).extend(uart.UART_DEVICE_SCHEMA)
@@ -175,29 +159,7 @@ async def to_code(config):
         conf = config[CONF_AC_INDOOR_TEMP_SENSOR]
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_ac_indoor_temp_sensor(sens))
-    if CONF_DEBUG_TX_SENSOR in config:
-        conf = config[CONF_DEBUG_TX_SENSOR]
-        # `conf` can be a bare ID, a mapping with 'id', or an inline text_sensor dict
-        if isinstance(conf, dict):
-            if CONF_ID in conf:
-                tx = await cg.get_variable(conf[CONF_ID])
-            else:
-                tx = await text_sensor.new_text_sensor(conf)
-                await cg.register_component(tx, conf)
-        else:
-            tx = await cg.get_variable(conf)
-        cg.add(var.set_debug_tx_text_sensor(tx))
-    if CONF_DEBUG_RX_SENSOR in config:
-        conf = config[CONF_DEBUG_RX_SENSOR]
-        if isinstance(conf, dict):
-            if CONF_ID in conf:
-                rx = await cg.get_variable(conf[CONF_ID])
-            else:
-                rx = await text_sensor.new_text_sensor(conf)
-                await cg.register_component(rx, conf)
-        else:
-            rx = await cg.get_variable(conf)
-        cg.add(var.set_debug_rx_text_sensor(rx))
+    # debug sensors removed
         
     for s in [CONF_PLASMA_SWITCH, CONF_BEEPER_SWITCH, CONF_SLEEP_SWITCH, CONF_XFAN_SWITCH, CONF_SAVE_SWITCH]:
         if s in config:

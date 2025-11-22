@@ -538,16 +538,6 @@ void SinclairAC::set_beeper_switch(switch_::Switch *beeper_switch)
     });
 }
 
-void SinclairAC::set_debug_tx_text_sensor(text_sensor::TextSensor *tx)
-{
-    this->debug_tx_text_sensor_ = tx;
-}
-
-void SinclairAC::set_debug_rx_text_sensor(text_sensor::TextSensor *rx)
-{
-    this->debug_rx_text_sensor_ = rx;
-}
-
 void SinclairAC::set_sleep_switch(switch_::Switch *sleep_switch)
 {
     this->sleep_switch_ = sleep_switch;
@@ -754,15 +744,9 @@ void SinclairAC::log_packet(std::vector<uint8_t> data, bool outgoing)
     if (outgoing) {
         std::string hex = format_hex_pretty(data);
         ESP_LOGI(TAG, "TX: %s", hex.c_str());
-        if (this->debug_tx_text_sensor_ != nullptr) {
-            this->debug_tx_text_sensor_->publish_state(hex);
-        }
     } else {
         std::string hex = format_hex_pretty(data);
         ESP_LOGV(TAG, "RX: %s", hex.c_str());
-        if (this->debug_rx_text_sensor_ != nullptr) {
-            this->debug_rx_text_sensor_->publish_state(hex);
-        }
     }
 }
 

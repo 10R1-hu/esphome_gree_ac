@@ -4,7 +4,6 @@
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
-#include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/core/component.h"
@@ -118,13 +117,9 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
         void set_xfan_switch(switch_::Switch *plasma_switch);
         void set_save_switch(switch_::Switch *plasma_switch);
         
-        void set_debug_tx_text_sensor(text_sensor::TextSensor *tx);
-        void set_debug_rx_text_sensor(text_sensor::TextSensor *rx);
-
         void set_current_temperature_sensor(sensor::Sensor *current_temperature_sensor);
         void set_ac_indoor_temp_sensor(sensor::Sensor *ac_indoor_temp_sensor);
-
-        void setup() override;
+            // debug text sensors removed
         void loop() override;
 
     protected:
@@ -147,8 +142,6 @@ class SinclairAC : public Component, public uart::UARTDevice, public climate::Cl
 
         sensor::Sensor *current_temperature_sensor_ = nullptr; /* If user wants to replace reported temperature by an external sensor readout */
         sensor::Sensor *ac_indoor_temp_sensor_   = nullptr; /* AC indoor temperature sensor for HA display */
-        text_sensor::TextSensor *debug_tx_text_sensor_ = nullptr; /* publish last TX hex */
-        text_sensor::TextSensor *debug_rx_text_sensor_ = nullptr; /* publish last RX hex */
 
         std::string vertical_swing_state_;
         std::string horizontal_swing_state_;
